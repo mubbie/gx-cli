@@ -189,7 +189,7 @@ def undo(
         raise typer.Exit(0)
 
     console.print()
-    console.print(f"[bold]\U0001f50d Detected:[/bold] {state['description']}")
+    console.print(f"[bold]Detected:[/bold] {state['description']}")
     console.print()
     console.print(f"  Action:  {state['action_msg']}")
     console.print(f"  Command: {state['command']}")

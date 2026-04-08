@@ -5,13 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/gx-git)](https://pypi.org/project/gx-git/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A terminal-based Git utility that bundles 10 focused productivity commands into a single CLI. Each command solves a specific daily friction point that currently requires multiple git commands, obscure flags, or manual effort.
-
-- Each command does one thing well
-- All destructive commands require confirmation and support `--dry-run`
-- Output is human-friendly with colors, tables, and clear formatting
-- Zero configuration required — works out of the box in any git repo
-- No external services or authentication needed — everything runs locally
+10 commands that solve daily git friction. No config, no services, runs locally in any repo. Destructive commands require confirmation and support `--dry-run`.
 
 ## Install
 
@@ -44,6 +38,7 @@ Requires Python 3.9+.
 | [`gx drift`](#gx-drift) | How far you've diverged from the HEAD branch |
 | [`gx switch`](#gx-switch) | Fuzzy branch switcher |
 | [`gx conflicts`](#gx-conflicts) | Preview merge conflicts before merging |
+| `gx update` | Update gx to the latest version |
 
 ---
 
@@ -72,7 +67,7 @@ Detects and reverses, in priority order:
 ```
 $ gx undo
 
-🔍 Detected: commit "Add search endpoint" (a1b2c3d, 2 minutes ago)
+Detected: commit "Add search endpoint" (a1b2c3d, 2 minutes ago)
 
   Action:  Soft reset to previous commit — your changes will be preserved in staging.
   Command: git reset --soft HEAD~1

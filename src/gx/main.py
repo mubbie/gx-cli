@@ -15,6 +15,7 @@ from gx.commands import (
     sweep,
     switch,
     undo,
+    update,
     who,
 )
 
@@ -39,6 +40,7 @@ app.command(name="ctx")(context.context)
 app.command()(drift.drift)
 app.command()(switch.switch)
 app.command()(conflicts.conflicts)
+app.command()(update.update)
 
 
 def version_callback(value: bool) -> None:
