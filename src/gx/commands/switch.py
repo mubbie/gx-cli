@@ -1,4 +1,4 @@
-"""gx switch — Fuzzy-find branch switcher with rich context."""
+"""gx switch — Branch switcher with search and rich context."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from gx.utils.git import (
     GitError,
     ensure_git_repo,
     get_current_branch,
-    get_head_branch,
     is_clean_working_tree,
     run_git,
     time_ago,
@@ -43,10 +42,52 @@ def _get_branches_with_info() -> list[dict]:
     return branches
 
 
+def _pick_branch(branches: list[dict]) -> str | None:
+    """Interactive branch picker with search support."""
+    console.print()
+    console.print("[bold]Select a branch:[/bold]")
+
+    query = ""
+    while True:
+        filtered = [b for b in branches if query in b["name"].lower()] if query else branches
+
+        console.print()
+        if not filtered:
+            console.print("  [dim]No branches match your search.[/dim]")
+        else:
+            for i, b in enumerate(filtered, 1):
+                age = time_ago(b["date"])
+                console.print(f"  {i:>3}  {b['name']:<40} {age:<15} {b['author']}")
+
+        console.print()
+        try:
+            prompt = f"Search or pick [1-{len(filtered)}]" if filtered else "Search"
+            choice = console.input(f"{prompt} (q to cancel): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return None
+
+        if choice.lower() == "q" or choice == "":
+            return None
+
+        # Try as a number
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(filtered):
+                return str(filtered[idx]["name"])
+            console.print(f"  [red]Invalid number. Pick 1-{len(filtered)}.[/red]")
+            continue
+        except ValueError:
+            pass
+
+        # Otherwise treat as search query
+        query = choice.lower()
+
+
 def switch(
     shortcut: str = typer.Argument(None, help='Use "-" to switch to previous branch.'),
 ) -> None:
-    """Fuzzy branch switcher with rich context."""
+    """Branch switcher with search and rich context."""
     try:
         ensure_git_repo()
     except GitError as e:
@@ -97,13 +138,7 @@ def switch(
             raise typer.Exit(1)
         return
 
-    # Launch Textual TUI
-    try:
-        from gx.commands._switch_tui import run_switch_tui
-        selected = run_switch_tui(selectable, get_head_branch())
-    except ImportError:
-        # Fallback to simple selection if Textual is not available or TUI fails
-        selected = _fallback_picker(selectable)
+    selected = _pick_branch(selectable)
 
     if selected is None:
         print_info("Cancelled.")
@@ -115,25 +150,3 @@ def switch(
     except GitError as e:
         print_error(f"Failed to switch: {e}")
         raise typer.Exit(1)
-
-
-def _fallback_picker(branches: list[dict]) -> str | None:
-    """Simple numbered list picker as fallback."""
-    console.print()
-    console.print("[bold]Select a branch:[/bold]")
-    console.print()
-    for i, b in enumerate(branches, 1):
-        age = time_ago(b["date"])
-        console.print(f"  {i:>3}  {b['name']:<40} {age:<15} {b['author']}")
-
-    console.print()
-    try:
-        choice = console.input("Enter number (or q to cancel): ")
-        if choice.strip().lower() in ("q", ""):
-            return None
-        idx = int(choice.strip()) - 1
-        if 0 <= idx < len(branches):
-            return str(branches[idx]["name"])
-        return None
-    except (ValueError, EOFError, KeyboardInterrupt):
-        return None

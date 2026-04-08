@@ -354,22 +354,20 @@ gx switch       # Interactive fuzzy branch picker
 gx switch -     # Switch to previous branch
 ```
 
-Launches an interactive TUI (powered by [Textual](https://textual.textualize.io/)) showing all local branches with last commit date, author, and ahead/behind counts (loaded asynchronously). Type to fuzzy-filter, arrow keys to navigate, Enter to select.
+Shows all local branches with last commit date and author. Type to search, pick by number, or cancel.
 
 ```
 $ gx switch
 
-  feature/payments    3 ahead, 1 behind   2h ago    kim
-  fix/login-bug       1 ahead, 0 behind   5h ago    you
-  feature/auth-v2     12 ahead, 8 behind   3d ago    james
-> feature/search      0 ahead, 0 behind   1d ago    you
+Select a branch:
 
-Search: sea█
+    1  feature/payments                          2h ago          kim
+    2  fix/login-bug                             5h ago          you
+    3  feature/auth-v2                           3d ago          james
+    4  feature/search                            1d ago          you
 
-↑↓ Navigate  Enter Select  Esc Cancel
+Search or pick [1-4] (q to cancel):
 ```
-
-Falls back to a simple numbered list picker in non-interactive terminals.
 
 ---
 
@@ -413,7 +411,6 @@ Uses `git merge-tree` to simulate the merge entirely in memory. Nothing is modif
 
 - [Typer](https://typer.tiangolo.com/) — CLI framework
 - [Rich](https://rich.readthedocs.io/) — Terminal formatting (colors, tables, spinners)
-- [Textual](https://textual.textualize.io/) — TUI components (fuzzy branch picker)
 
 ## License
 
