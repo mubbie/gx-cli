@@ -5,10 +5,10 @@ from __future__ import annotations
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Footer, Header, Input, Static
 from textual.reactive import reactive
+from textual.widgets import Header, Input, Static
 
-from gx.utils.git import run_git, GitError, time_ago
+from gx.utils.git import GitError, run_git, time_ago
 
 
 class BranchItem(Static):

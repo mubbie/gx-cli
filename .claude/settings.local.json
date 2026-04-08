@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(gx --version)",
+      "Bash(gx)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(gh auth:*)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'Initial release: gx-git v0.1.0 — Git Productivity Toolkit:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(git commit -m 'Remove --all-repos from recap, clean up README:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(gx:*)",
+      "Bash(git pull:*)",
+      "Bash(gh run:*)",
+      "Bash(ruff check:*)"
+    ]
+  }
+}

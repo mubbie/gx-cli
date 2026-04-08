@@ -19,16 +19,13 @@ from gx.utils.display import (
     print_info,
     print_success,
     print_table,
-    print_warning,
 )
 from gx.utils.git import (
     GitError,
     ensure_git_repo,
-    get_current_branch,
     get_last_commit,
     get_reflog_entries,
     get_repo_root,
-    is_commit_pushed,
     run_git,
     time_ago,
 )
@@ -115,7 +112,7 @@ def _detect_state() -> dict | None:
             "type": "stage",
             "description": f"{count} staged file{'s' if count != 1 else ''}",
             "command": "git reset HEAD",
-            "action_msg": f"Unstage all files \u2014 changes stay in your working tree.",
+            "action_msg": "Unstage all files \u2014 changes stay in your working tree.",
         }
 
     # Priority 4+: Walk reflog for recent actions
@@ -236,7 +233,6 @@ def undo(
 
     console.print()
     if state["type"] == "stage":
-        staged = run_git(["diff", "--cached", "--name-only"], check=False)
         print_success("Unstaged files. Your changes are preserved in the working tree.")
     elif state["type"] == "commit":
         print_success("Undone. Your changes from that commit are now staged.")

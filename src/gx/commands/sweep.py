@@ -7,9 +7,7 @@ import typer
 from gx.utils.display import (
     confirm_action,
     console,
-    print_dry_run,
     print_error,
-    print_info,
     print_success,
 )
 from gx.utils.git import (
@@ -159,7 +157,8 @@ def sweep(
         console.print()
 
     total_branches = len(merged) + len(squash_merged)
-    console.print(f"Summary: {len(merged)} merged, {len(squash_merged)} likely squash-merged, {len(stale_refs)} stale refs")
+    n_merged, n_squash, n_stale = len(merged), len(squash_merged), len(stale_refs)
+    console.print(f"Summary: {n_merged} merged, {n_squash} likely squash-merged, {n_stale} stale refs")
     console.print()
 
     if dry_run:

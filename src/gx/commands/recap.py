@@ -155,7 +155,8 @@ def _recap_single_repo(author: str | None, days: int, all_authors: bool, limit: 
         return
 
     console.print()
-    console.print(f"[bold]{author_display} activity in the last {days} day{'s' if days != 1 else ''} ({repo_name}):[/bold]")
+    day_label = f"{days} day{'s' if days != 1 else ''}"
+    console.print(f"[bold]{author_display} activity in the last {day_label} ({repo_name}):[/bold]")
     console.print()
 
     grouped = _group_by_date(commits)
@@ -199,23 +200,8 @@ def _recap_all_authors(days: int, limit: int) -> None:
         print_info(f"No activity in the last {days} day{'s' if days != 1 else ''}.")
         return
 
-    # Group by author
-    by_author: dict[str, list[dict]] = defaultdict(list)
-    for line in output.splitlines():
-        parts = line.split(" ", 3)
-        if len(parts) < 4:
-            continue
-        hash_val = parts[0]
-        date = parts[1]
-        # Author name may contain spaces, message follows
-        rest = parts[2] + " " + parts[3] if len(parts) > 3 else parts[2]
-        # This is tricky — we need a better separator
-        # Let's use a custom format with a separator
-        pass
-
-    # Re-fetch with a proper separator
-    sep = "\t"
-    fmt2 = f"%h{sep}%aI{sep}%an{sep}%s"
+    # Fetch with tab-separated format for reliable parsing
+    fmt2 = "%h\t%aI\t%an\t%s"
     args2 = ["log", "--all", f"--format={fmt2}", f"--since={since}", f"-{limit}"]
     try:
         output = run_git(args2)

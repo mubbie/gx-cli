@@ -80,7 +80,8 @@ def context() -> None:
                     ["rev-list", "--left-right", "--count", f"{branch}...{head_branch}"]
                 )
                 ahead, behind = ab.split()
-                console.print(f"[bold]vs {head_branch}:[/bold]{'':>{8 - len(head_branch)}} {ahead} ahead, {behind} behind")
+                pad = " " * max(0, 8 - len(head_branch))
+                console.print(f"[bold]vs {head_branch}:[/bold]{pad} {ahead} ahead, {behind} behind")
             except GitError:
                 pass
 

@@ -5,14 +5,13 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from gx.utils.config import DEFAULT_WHO_LIMIT, WHO_MAX_FILES
 from gx.utils.display import console, print_error, print_info, print_table, print_warning
-from gx.utils.git import GitError, ensure_git_repo, get_repo_root, run_git, time_ago
+from gx.utils.git import GitError, ensure_git_repo, run_git, time_ago
 
 
 def _blame_file(filepath: str, since: str | None = None, cwd: str | None = None) -> dict[str, int]:

@@ -173,9 +173,9 @@ def nuke(
         if not local:
             if info["remote"]:
                 console.print(f"  [red]\u2717[/red] Remote tracking ref   (origin/{info['name']})")
-                console.print(f"  [red]\u2717[/red] Remote branch         (origin)")
+                console.print("  [red]\u2717[/red] Remote branch         (origin)")
             elif info.get("remote"):
-                console.print(f"  - Remote              (not found)")
+                console.print("  - Remote              (not found)")
 
         if not info["merged"]:
             console.print()

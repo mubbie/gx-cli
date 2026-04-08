@@ -20,7 +20,6 @@ from gx.utils.git import (
 def _parse_merge_tree_conflicts(output: str) -> list[dict]:
     """Parse git merge-tree output for conflict markers."""
     conflicts = []
-    current_file = None
 
     # merge-tree output contains conflict sections
     # Look for lines indicating conflicted files
@@ -75,7 +74,6 @@ def _parse_new_merge_tree(output: str, target_branch: str) -> tuple[list[dict], 
     """Parse new-style merge-tree output (Git 2.38+)."""
     conflicts = []
     clean_files = 0
-    in_conflicts = False
 
     for line in output.splitlines():
         if line.startswith("CONFLICT"):

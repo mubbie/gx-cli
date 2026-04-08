@@ -9,7 +9,7 @@ import sys
 import typer
 
 from gx import __version__
-from gx.utils.display import console, print_error, print_info, print_success
+from gx.utils.display import console, print_error, print_success
 
 
 def _get_latest_version() -> str | None:
@@ -69,10 +69,10 @@ def update() -> None:
     pipx = shutil.which("pipx")
     if pipx:
         cmd = [pipx, "upgrade", "gx-git"]
-        console.print(f"Upgrading via pipx...")
+        console.print("Upgrading via pipx...")
     else:
         cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "gx-git"]
-        console.print(f"Upgrading via pip...")
+        console.print("Upgrading via pip...")
 
     try:
         result = subprocess.run(cmd, timeout=60)
