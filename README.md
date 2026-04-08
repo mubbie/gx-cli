@@ -5,7 +5,13 @@
 [![Python](https://img.shields.io/pypi/pyversions/gx-git)](https://pypi.org/project/gx-git/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-10 commands that solve daily git friction. No config, no services, runs locally in any repo. Destructive commands require confirmation and support `--dry-run`.
+Git Productivity Toolkit
+
+- Each command does one thing well
+- All destructive commands require confirmation and support `--dry-run`
+- Output is human-friendly with colors, tables, and clear formatting
+- Zero configuration required (works out of the box in any git repo)
+- No external services or authentication needed (everything runs locally)
 
 ## Install
 
