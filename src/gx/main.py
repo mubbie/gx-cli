@@ -9,11 +9,15 @@ from gx.commands import (
     conflicts,
     context,
     drift,
+    graph,
     nuke,
     oops,
     recap,
+    retarget,
+    stack_cmd,
     sweep,
     switch,
+    sync,
     undo,
     update,
     who,
@@ -27,19 +31,29 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Register commands
-app.command()(undo.undo)
-app.command(name="redo")(undo.redo)
-app.command()(who.who)
-app.command()(nuke.nuke)
-app.command()(recap.recap)
-app.command()(sweep.sweep)
+# Everyday
+app.command(help="Smart undo \u2014 detects the last git action and reverses it.")(undo.undo)
+app.command(name="redo", help="Redo the last undo.")(undo.redo)
 app.command()(oops.oops)
-app.command()(context.context)
-app.command(name="ctx")(context.context)
-app.command()(drift.drift)
 app.command()(switch.switch)
+app.command()(context.context)
+app.command(name="ctx", hidden=True)(context.context)
+app.command()(sweep.sweep)
+
+# Insight
+app.command()(who.who)
+app.command()(recap.recap)
+app.command()(drift.drift)
 app.command()(conflicts.conflicts)
+
+# Stacking
+app.command(name="stack")(stack_cmd.stack)
+app.command()(sync.sync)
+app.command()(retarget.retarget)
+app.command()(graph.graph)
+
+# Utility
+app.command()(nuke.nuke)
 app.command()(update.update)
 
 

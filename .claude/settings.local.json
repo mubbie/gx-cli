@@ -22,7 +22,8 @@
       "Bash(git pull:*)",
       "Bash(gh run:*)",
       "Bash(ruff check:*)",
-      "Bash(mypy:*)"
+      "Bash(mypy:*)",
+      "Bash(set PYTHONIOENCODING=utf-8)"
     ]
   }
 }

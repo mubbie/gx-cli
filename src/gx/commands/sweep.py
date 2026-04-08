@@ -194,5 +194,12 @@ def sweep(
             except GitError as e:
                 print_error(f"Failed to prune: {e}")
 
+    # Clean up stack config for deleted branches
+    try:
+        from gx.utils.stack import clean_deleted_branches
+        clean_deleted_branches()
+    except ImportError:
+        pass
+
     console.print()
     print_success("Cleanup complete.")

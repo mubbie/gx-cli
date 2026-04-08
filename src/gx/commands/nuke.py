@@ -106,6 +106,7 @@ def nuke(
     local: bool = typer.Option(False, "--local", help="Only delete local branch."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deleted."),
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation."),
+    orphans: bool = typer.Option(False, "--orphans", help="Delete all orphaned branches from the stack."),
 ) -> None:
     """Delete branches with confidence \u2014 local, remote, and tracking refs."""
     try:
@@ -113,6 +114,11 @@ def nuke(
     except GitError as e:
         print_error(str(e))
         raise typer.Exit(1)
+
+    # Handle --orphans mode
+    if orphans:
+        _nuke_orphans(dry_run, yes)
+        return
 
     branches = _resolve_branches(pattern)
     if not branches:
@@ -190,6 +196,20 @@ def nuke(
             print_info("Cancelled.")
             raise typer.Exit(0)
 
+    # Warn about stack children
+    try:
+        from gx.utils.stack import get_children
+        for info in infos:
+            children = get_children(info["name"])
+            if children:
+                child_list = ", ".join(children)
+                print_warning(
+                    f"{info['name']} has {len(children)} dependent branch(es) "
+                    f"in your stack ({child_list}). They will become orphaned."
+                )
+    except ImportError:
+        pass
+
     # Delete
     for info in infos:
         name = info["name"]
@@ -212,3 +232,47 @@ def nuke(
                 print_success(f"Deleted remote branch origin/{name}")
             except GitError as e:
                 print_error(f"Failed to delete remote branch {name}: {e}")
+
+        # Clean up stack config
+        try:
+            from gx.utils.stack import remove_branch
+            remove_branch(name)
+        except ImportError:
+            pass
+
+
+def _nuke_orphans(dry_run: bool, yes: bool) -> None:
+    """Delete all orphaned branches from the stack."""
+    from gx.utils.stack import build_branch_stack
+
+    stack = build_branch_stack()
+    if not stack.orphans:
+        print_info("No orphaned branches found.")
+        return
+
+    console.print()
+    console.print("[bold]Orphaned branches:[/bold]")
+    for orphan in stack.orphans:
+        console.print(f"  {orphan.name}")
+    console.print()
+
+    if dry_run:
+        console.print(f"[yellow]DRY RUN[/yellow] — would delete {len(stack.orphans)} orphaned branches.")
+        return
+
+    if not yes:
+        if not confirm_action(f"Delete {len(stack.orphans)} orphaned branches?"):
+            print_info("Cancelled.")
+            return
+
+    for orphan in stack.orphans:
+        try:
+            run_git(["branch", "-D", orphan.name])
+            print_success(f"Deleted {orphan.name}")
+            try:
+                from gx.utils.stack import remove_branch
+                remove_branch(orphan.name)
+            except ImportError:
+                pass
+        except GitError as e:
+            print_error(f"Failed to delete {orphan.name}: {e}")

@@ -185,3 +185,24 @@ def time_ago(date_str: str) -> str:
         return f"{months} month{'s' if months != 1 else ''} ago"
     except (ValueError, TypeError):
         return date_str
+
+
+def get_git_version() -> tuple[int, int, int]:
+    """Returns (major, minor, patch) from `git --version`."""
+    output = run_git(["--version"])
+    # "git version 2.41.0" or "git version 2.41.0.windows.1"
+    parts = output.split()
+    for part in parts:
+        if part[0].isdigit():
+            nums = part.split(".")
+            try:
+                return (int(nums[0]), int(nums[1]), int(nums[2]) if len(nums) > 2 else 0)
+            except (ValueError, IndexError):
+                pass
+    return (0, 0, 0)
+
+
+def supports_update_refs() -> bool:
+    """Returns True if Git >= 2.38 (supports rebase --update-refs)."""
+    major, minor, _ = get_git_version()
+    return (major, minor) >= (2, 38)
