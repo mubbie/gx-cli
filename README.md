@@ -40,6 +40,10 @@ Requires Python 3.9+.
 | [`gx drift`](#gx-drift) | How far you've diverged from the HEAD branch |
 | [`gx switch`](#gx-switch) | Fuzzy branch switcher |
 | [`gx conflicts`](#gx-conflicts) | Preview merge conflicts before merging |
+| [`gx stack`](#gx-stack) | Create a stacked branch with tracked parent |
+| [`gx sync`](#gx-sync) | Rebase and push a chain of stacked branches |
+| [`gx retarget`](#gx-retarget) | Rebase a branch onto a new base |
+| [`gx graph`](#gx-graph) | Visualize the branch stack tree |
 | `gx update` | Update gx to the latest version |
 
 ---
@@ -153,8 +157,9 @@ Branch: feature/old-auth
 | `--local` | false | Only delete local branch |
 | `--dry-run` | false | Show what would be deleted |
 | `-y, --yes` | false | Skip confirmation (still blocked for unmerged + HEAD branch) |
+| `--orphans` | false | Delete all orphaned branches from the stack graph |
 
-**Safety:** Cannot nuke the current branch or the HEAD branch (main/master). Unmerged branches get a prominent warning with commit count.
+**Safety:** Cannot nuke the current branch or the HEAD branch (main/master). Unmerged branches get a prominent warning with commit count. Warns if the branch has dependents in the stack.
 
 ---
 
@@ -410,6 +415,129 @@ Checking feature/search against main...
 ```
 
 Uses `git merge-tree` to simulate the merge entirely in memory. Nothing is modified on disk.
+
+---
+
+## gx stack
+
+Create a new branch on top of a parent branch, with the relationship tracked in `.git/gx/stack.json`.
+
+```
+gx stack feature/auth-v2 feature/auth-v1   # Direct usage
+gx stack                                    # Interactive prompt
+```
+
+```
+$ gx stack feature/auth-v2 feature/auth-v1
+
+✓ Created feature/auth-v2 on top of feature/auth-v1
+  Relationship saved to stack config.
+```
+
+In interactive mode, shows a searchable branch list for parent selection, then prompts for the new branch name.
+
+---
+
+## gx sync
+
+Rebase and push a chain of stacked branches in sequence, keeping the entire stack up to date.
+
+```
+gx sync --stack                              # Auto-detect and sync full stack
+gx sync main feature/auth-v1 feature/auth-v2 # Explicit chain
+gx sync --dry-run --stack                    # Show what would happen
+```
+
+```
+$ gx sync --stack
+
+Auto-detected stack from config:
+  main -> feature/auth-v1 -> feature/auth-v2
+
+Syncing 2 branches...
+
+  Rebasing stack onto main (using --update-refs)...
+  ✓ Rebased feature/auth-v1
+  ✓ Rebased feature/auth-v2
+
+  Pushing updated branches...
+  ✓ Pushed feature/auth-v1
+  ✓ Pushed feature/auth-v2
+
+✓ Stack sync complete. 2 branches updated.
+```
+
+Uses `git rebase --update-refs` on Git 2.38+ (single operation for the whole chain). Falls back to `--onto` iteration on older Git versions. Stops on first conflict with resolution instructions.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--stack` | false | Auto-detect and sync the current branch's full stack |
+| `--dry-run` | false | Show what would happen |
+
+**Safety:** Uses `--force-with-lease` for pushes. Stops on first conflict. Confirms for chains of 5+ branches. Returns to original branch after sync.
+
+---
+
+## gx retarget
+
+Rebase a branch onto a new base. Updates the stack config and attempts to auto-retarget the PR via `gh` CLI.
+
+```
+gx retarget feature/auth-v2 main        # Move feature/auth-v2 onto main
+gx retarget feature/auth-v2 main --dry-run
+```
+
+```
+$ gx retarget feature/auth-v2 main
+
+Retargeting feature/auth-v2 onto main...
+
+  Old parent: feature/auth-v1
+  New parent: main
+
+  Fetching latest from remote...
+  Rebasing feature/auth-v2 onto origin/main (using --onto)...
+  ✓ Rebased and pushed feature/auth-v2
+  ✓ PR for feature/auth-v2 automatically retargeted to main
+
+  Stack config updated: feature/auth-v2 -> main (was: feature/auth-v1)
+```
+
+Uses `git rebase --onto` to slice out only the branch's own commits, avoiding duplication of the old parent's commits. If `gh` CLI is installed and authenticated, auto-retargets the PR; otherwise shows a reminder.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | false | Show what would happen |
+
+---
+
+## gx graph
+
+Visualize the branch stack as a tree with health indicators.
+
+```
+gx graph
+```
+
+```
+$ gx graph
+
+Branch Stack:
+
+|-- main
+|   |-- feature/auth-v1       * HEAD  (+2/-0)
+|   |   `-- feature/auth-v2            (+3/-1)
+|   |-- feature/search                 + merged
+|   `-- fix/login-bug                  (+1/-0)
+
+Orphaned Branches:
+`-- experiment/old-idea                ! orphaned
+
+Legend: * current branch  + merged  (+ahead/-behind)  ! orphaned
+Relationships stored in .git/gx/stack.json
+```
+
+The tree builder auto-discovers relationships for branches created outside of `gx` and saves them to the config, so the graph gets more accurate over time.
 
 ---
 
