@@ -167,10 +167,9 @@ Show what you (or someone else) did recently across one or more repos.
 
 ```
 gx recap                 # Your commits in the last 24 hours
-gx recap @sarah          # Sarah's commits in the last 24 hours
+gx recap @kim          # Sarah's commits in the last 24 hours
 gx recap --all           # Whole team's activity in the last 24 hours
 gx recap -d 7            # Last 7 days
-gx recap --all-repos     # Scan all repos in parent directory
 ```
 
 ```
@@ -195,9 +194,7 @@ Your activity in the last 24 hours (my-project):
 | `@<name>` | current git user | Filter by author (substring match) |
 | `-d, --days` | 1 | Number of days to look back |
 | `--all` | false | Show all contributors |
-| `--all-repos` | false | Scan all git repos in parent directory |
-| `--no-limit` | false | Remove the 20-repo cap |
-| `--limit` | 100 | Max commits to display per repo |
+| `--limit` | 100 | Max commits to display |
 
 ---
 
@@ -339,7 +336,7 @@ Commits on your branch (not on main):
   h7i8j9k  1d ago   Scaffold search module
 
 Commits on main (not on your branch):
-  x1y2z3a  3h ago   Fix auth token refresh (sarah)
+  x1y2z3a  3h ago   Fix auth token refresh (kim)
   b4c5d6e  1d ago   Update CI pipeline (james)
 
 Files diverged: 8 modified, 2 added
@@ -365,7 +362,7 @@ Launches an interactive TUI (powered by [Textual](https://textual.textualize.io/
 ```
 $ gx switch
 
-  feature/payments    3 ahead, 1 behind   2h ago    sarah
+  feature/payments    3 ahead, 1 behind   2h ago    kim
   fix/login-bug       1 ahead, 0 behind   5h ago    you
   feature/auth-v2     12 ahead, 8 behind   3d ago    james
 > feature/search      0 ahead, 0 behind   1d ago    you
@@ -395,7 +392,7 @@ Checking feature/search against main...
 
 ✗ 3 conflicts found
 
-  src/api/auth.ts          (you + sarah)
+  src/api/auth.ts          (you + kim)
   src/utils/helpers.ts     (you + james)
   package.json             (dependency versions)
 
@@ -414,16 +411,6 @@ Checking feature/search against main...
 Uses `git merge-tree` to simulate the merge entirely in memory. Nothing is modified on disk.
 
 ---
-
-## Global Options
-
-```
-gx --help       # Full help
-gx <cmd> --help # Command-specific help
-gx --version    # Version number
-```
-
-Respects `NO_COLOR` and `GX_NO_COLOR` environment variables to disable colored output. Automatically disables colors and interactive features when stdout is not a TTY.
 
 ## Tech Stack
 

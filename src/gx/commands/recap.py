@@ -5,12 +5,11 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import typer
 
-from gx.utils.config import DEFAULT_RECAP_DAYS, RECAP_MAX_COMMITS, RECAP_MAX_REPO_DEPTH, RECAP_MAX_REPOS
-from gx.utils.display import console, print_error, print_info, print_warning
+from gx.utils.config import DEFAULT_RECAP_DAYS, RECAP_MAX_COMMITS
+from gx.utils.display import console, print_error, print_info
 from gx.utils.git import GitError, ensure_git_repo, get_repo_root, run_git
 
 
@@ -19,21 +18,6 @@ def _get_current_user() -> str:
         return run_git(["config", "user.name"])
     except GitError:
         return ""
-
-
-def _find_repos(base_dir: str, max_depth: int = RECAP_MAX_REPO_DEPTH) -> list[str]:
-    """Find git repos in base_dir up to max_depth."""
-    repos = []
-    base = Path(base_dir)
-    for root, dirs, _files in os.walk(base):
-        depth = len(Path(root).relative_to(base).parts)
-        if depth > max_depth:
-            dirs.clear()
-            continue
-        if ".git" in dirs:
-            repos.append(str(root))
-            dirs.remove(".git")  # Don't recurse into .git
-    return repos
 
 
 def _get_commits(
@@ -125,28 +109,18 @@ def _group_by_date(commits: list[dict]) -> dict[str, list[dict]]:
     return grouped
 
 
-def _group_by_author(commits: list[dict], cwd: str | None = None) -> dict[str, list[dict]]:
-    """Requery to get commits grouped by author."""
-    # We need author info, so re-fetch with author format
-    # This is a simplification — we get author from an extended format
-    return {}
-
-
 def recap(
-    author: str = typer.Argument(None, help="Filter by author (e.g., @sarah). Omit for your own commits."),
+    author: str = typer.Argument(None, help="Filter by author (e.g., @kim). Omit for your own commits."),
     days: int = typer.Option(DEFAULT_RECAP_DAYS, "-d", "--days", help="Number of days to look back."),
     all_authors: bool = typer.Option(False, "--all", help="Show all contributors."),
-    all_repos: bool = typer.Option(False, "--all-repos", help="Scan all git repos in parent directory."),
-    no_limit: bool = typer.Option(False, "--no-limit", help="Remove the repo cap."),
-    limit: int = typer.Option(RECAP_MAX_COMMITS, "--limit", help="Max commits to display per repo."),
+    limit: int = typer.Option(RECAP_MAX_COMMITS, "--limit", help="Max commits to display."),
 ) -> None:
     """Show what you (or someone else) did recently."""
     try:
         ensure_git_repo()
     except GitError as e:
-        if not all_repos:
-            print_error(str(e))
-            raise typer.Exit(1)
+        print_error(str(e))
+        raise typer.Exit(1)
 
     # Resolve author
     author_filter = author
@@ -158,10 +132,7 @@ def recap(
             print_error("Cannot determine your git user. Set git config user.name or specify an author.")
             raise typer.Exit(1)
 
-    if all_repos:
-        _recap_all_repos(author_filter, days, all_authors, no_limit, limit)
-    else:
-        _recap_single_repo(author_filter, days, all_authors, limit)
+    _recap_single_repo(author_filter, days, all_authors, limit)
 
 
 def _recap_single_repo(author: str | None, days: int, all_authors: bool, limit: int) -> None:
@@ -283,57 +254,3 @@ def _recap_all_authors(days: int, limit: int) -> None:
         total += len(commits)
 
     console.print(f"  {total} commits from {len(by_author)} contributor{'s' if len(by_author) != 1 else ''}")
-
-
-def _recap_all_repos(author: str | None, days: int, all_authors: bool, no_limit: bool, limit: int) -> None:
-    """Scan all repos in parent directory."""
-    try:
-        root = get_repo_root()
-        parent = os.path.dirname(root)
-    except GitError:
-        parent = os.path.dirname(os.getcwd())
-
-    repos = _find_repos(parent)
-    if not repos:
-        print_info("No git repositories found in parent directory.")
-        return
-
-    if len(repos) > RECAP_MAX_REPOS and not no_limit:
-        print_warning(
-            f"Found {len(repos)} repos in parent directory. Scanning first {RECAP_MAX_REPOS}.\n"
-            f"  Use --no-limit to scan all (this may take a while)."
-        )
-        repos = repos[:RECAP_MAX_REPOS]
-
-    author_display = "Your" if author == _get_current_user() else f"{author}'s" if author else "Team"
-
-    console.print()
-    console.print(f"[bold]{author_display} activity in the last {days} day{'s' if days != 1 else ''}:[/bold]")
-    console.print()
-
-    total_commits = 0
-    active_repos = 0
-
-    for repo_path in repos:
-        repo_name = os.path.basename(repo_path)
-        commits = _get_commits(author, days, all_authors=all_authors, cwd=repo_path, limit=limit)
-        if not commits:
-            continue
-
-        active_repos += 1
-        total_commits += len(commits)
-
-        console.print(f"  [bold]{repo_name}/[/bold] ({len(commits)} commit{'s' if len(commits) != 1 else ''}):")
-        for c in commits:
-            try:
-                dt = datetime.fromisoformat(c["date"].replace("Z", "+00:00"))
-                time_str = dt.strftime("%H:%M")
-            except (ValueError, TypeError):
-                time_str = "     "
-            console.print(f"    [dim]{c['hash']}[/dim]  {time_str}  {c['message']}")
-        console.print()
-
-    if total_commits == 0:
-        print_info(f"No activity in the last {days} day{'s' if days != 1 else ''}.")
-    else:
-        console.print(f"  {total_commits} commits across {active_repos} repo{'s' if active_repos != 1 else ''}")
