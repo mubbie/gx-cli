@@ -14,6 +14,7 @@ from gx.commands import (
     oops,
     recap,
     retarget,
+    shelf,
     stack_cmd,
     sweep,
     switch,
@@ -38,6 +39,7 @@ app.command()(switch.switch)
 app.command()(context.context)
 app.command(name="ctx", hidden=True)(context.context)
 app.command()(sweep.sweep)
+app.add_typer(shelf.shelf_app)
 
 # Insight
 app.command()(who.who)
@@ -60,7 +62,7 @@ _GROUPED_HELP = """\
 gx \u2014 Git Productivity Toolkit
 
 Everyday:
-  undo, redo, oops, switch, context, sweep
+  undo, redo, oops, switch, context, sweep, shelf
 
 Insight:
   who, recap, drift, conflicts

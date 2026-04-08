@@ -37,6 +37,7 @@ Requires Python 3.9+.
 | [`gx switch`](#gx-switch) | Branch switcher with search |
 | [`gx context`](#gx-context) | Repo status at a glance |
 | [`gx sweep`](#gx-sweep) | Clean up merged branches and stale refs |
+| [`gx shelf`](#gx-shelf) | Visual stash manager |
 
 **Insight:**
 
@@ -435,6 +436,43 @@ Uses `git merge-tree` to simulate the merge entirely in memory. Nothing is modif
 
 ---
 
+## gx shelf
+
+Visual stash manager. Browse, preview diffs, and apply or drop stashes interactively.
+
+```
+gx shelf                      # Open interactive stash browser (TUI)
+gx shelf push "message"       # Quick stash with a descriptive message
+gx shelf push                 # Quick stash (auto-generates message)
+gx shelf list                 # Non-interactive list
+gx shelf clear                # Drop all stashes (requires confirmation)
+gx shelf clear --dry-run      # Show what would be cleared
+```
+
+The interactive browser is a split-pane TUI (powered by [Textual](https://textual.textualize.io/)): stash list on the left, full diff preview on the right. Navigate with arrow keys, Enter to pop, Space to apply (keep stash), `d` to drop, `/` to search.
+
+```
+$ gx shelf list
+
+3 stashes:
+
+  #   Age           Branch              Message
+  0   2 hours ago   feature/auth-v2     WIP on feature/auth-v2
+  1   3 days ago    feature/search      Fix token refresh
+  2   2 weeks ago   main                WIP on main
+```
+
+```
+$ gx shelf push "Fix token refresh"
+
+✓ Stashed working directory: "Fix token refresh"
+  Run `gx shelf` to browse.
+```
+
+**Safety:** Pop/apply conflicts exit the TUI cleanly with resolution instructions. Drop requires confirmation.
+
+---
+
 ## gx stack
 
 Create a new branch on top of a parent branch, with the relationship tracked in `.git/gx/stack.json`.
@@ -562,6 +600,7 @@ The tree builder auto-discovers relationships for branches created outside of `g
 
 - [Typer](https://typer.tiangolo.com/) — CLI framework
 - [Rich](https://rich.readthedocs.io/) — Terminal formatting (colors, tables, spinners)
+- [Textual](https://textual.textualize.io/) — TUI for interactive stash browser
 
 ## License
 
