@@ -8,7 +8,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import Footer, Header, Input, ListItem, ListView, RichLog, Static
+from textual.widgets import Footer, Header, ListItem, ListView, RichLog, Static
 
 from gx.utils.config import SHELF_DIFF_CACHE_MAX
 from gx.utils.git import GitError, run_git
@@ -93,19 +93,6 @@ def _escape(text: str) -> str:
     return text.replace("[", "\\[")
 
 
-class StashItem(Static):
-    """A single stash entry in the list."""
-
-    def __init__(self, entry: StashEntry, **kwargs) -> None:  # type: ignore[override]
-        self.entry = entry
-        time_str = entry.relative_time
-        msg = entry.message
-        if len(msg) > 50:
-            msg = msg[:47] + "..."
-        text = f"{entry.stash_id}  {time_str}\n{msg}"
-        super().__init__(text, **kwargs)
-
-
 class StashBrowser(App):  # type: ignore[type-arg]
     """Full-screen stash browser with split-pane layout."""
 
@@ -121,30 +108,6 @@ class StashBrowser(App):  # type: ignore[type-arg]
     #diff-preview {
         width: 60%;
     }
-    .stash-item {
-        padding: 0 1;
-        height: 3;
-    }
-    .stash-item:hover {
-        background: $accent;
-    }
-    .stash-item.--highlight {
-        background: $accent;
-    }
-    #search-bar {
-        display: none;
-        dock: bottom;
-        height: 1;
-    }
-    #search-bar.visible {
-        display: block;
-    }
-    #empty-state {
-        width: 100%;
-        height: 100%;
-        content-align: center middle;
-        color: $text-muted;
-    }
     """
 
     BINDINGS = [
@@ -153,62 +116,55 @@ class StashBrowser(App):  # type: ignore[type-arg]
         Binding("enter", "pop_stash", "Pop"),
         Binding("space", "apply_stash", "Apply (keep)"),
         Binding("d", "drop_stash", "Drop"),
-        Binding("slash", "search", "Search"),
         Binding("tab", "focus_diff", "Focus diff"),
         Binding("escape", "quit_app", "Exit"),
     ]
 
     _diff_cache: dict[str, str] = {}
     _stashes: list[StashEntry] = []
-    _filtered: list[StashEntry] = []
     _highlight: int = 0
-    _confirming_drop: bool = False
-    _search_active: bool = False
-    _result_action: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Horizontal(id="main-area"):
             yield ListView(id="stash-list")
             yield RichLog(id="diff-preview", highlight=False, markup=True)
-        yield Input(placeholder="Filter stashes...", id="search-bar")
         yield Footer()
 
     def on_mount(self) -> None:
         self._stashes = get_stash_list()
-        self._filtered = list(self._stashes)
-        self._render_list()
-        if self._filtered:
+        self._populate_list()
+        if self._stashes:
             self._load_diff_for_current()
 
-    def _render_list(self) -> None:
+    def _populate_list(self) -> None:
+        """Populate the list once on mount."""
         lv = self.query_one("#stash-list", ListView)
-        lv.clear()
-        if not self._filtered:
+        if not self._stashes:
             lv.append(ListItem(Static("No stashes."), id="empty-item"))
             return
-        for i, entry in enumerate(self._filtered):
-            item = ListItem(StashItem(entry), id=f"s-{i}")
-            lv.append(item)
-        self._highlight = min(self._highlight, len(self._filtered) - 1)
-        if self._filtered:
-            lv.index = self._highlight
+        for i, entry in enumerate(self._stashes):
+            msg = entry.message
+            if len(msg) > 50:
+                msg = msg[:47] + "..."
+            text = f"{entry.stash_id}  {entry.relative_time}\n{msg}"
+            lv.append(ListItem(Static(text), id=f"s-{i}"))
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.item is None:
             return
         lv = self.query_one("#stash-list", ListView)
         idx = lv.index
-        if idx is not None and 0 <= idx < len(self._filtered):
+        if idx is not None and 0 <= idx < len(self._stashes):
             self._highlight = idx
             self._load_diff_for_current()
 
     @work(thread=True)
     def _load_diff_for_current(self) -> None:
-        if not self._filtered:
+        if not self._stashes:
             return
-        idx = min(self._highlight, len(self._filtered) - 1)
-        stash_id = self._filtered[idx].stash_id
+        idx = min(self._highlight, len(self._stashes) - 1)
+        stash_id = self._stashes[idx].stash_id
         if stash_id in self._diff_cache:
             diff = self._diff_cache[stash_id]
         else:
@@ -216,15 +172,14 @@ class StashBrowser(App):  # type: ignore[type-arg]
                 diff = run_git(["stash", "show", "-p", stash_id])
             except GitError:
                 diff = "(failed to load diff)"
-            # Evict oldest if cache full
             if len(self._diff_cache) >= SHELF_DIFF_CACHE_MAX:
                 oldest = next(iter(self._diff_cache))
                 del self._diff_cache[oldest]
             self._diff_cache[stash_id] = diff
 
-        self.call_from_thread(self._show_diff, diff, stash_id)
+        self.call_from_thread(self._show_diff, diff)
 
-    def _show_diff(self, diff: str, stash_id: str) -> None:
+    def _show_diff(self, diff: str) -> None:
         preview = self.query_one("#diff-preview", RichLog)
         preview.clear()
         preview.write(_format_diff(diff))
@@ -232,73 +187,34 @@ class StashBrowser(App):  # type: ignore[type-arg]
     # -- Actions --
 
     def action_cursor_up(self) -> None:
-        lv = self.query_one("#stash-list", ListView)
-        lv.action_cursor_up()
+        self.query_one("#stash-list", ListView).action_cursor_up()
 
     def action_cursor_down(self) -> None:
-        lv = self.query_one("#stash-list", ListView)
-        lv.action_cursor_down()
+        self.query_one("#stash-list", ListView).action_cursor_down()
 
     def action_pop_stash(self) -> None:
-        if not self._filtered:
+        if not self._stashes:
             return
-        entry = self._filtered[self._highlight]
-        self._result_action = f"pop:{entry.stash_id}"
-        self.exit(self._result_action)
+        entry = self._stashes[self._highlight]
+        self.exit(f"pop:{entry.stash_id}")
 
     def action_apply_stash(self) -> None:
-        if not self._filtered:
+        if not self._stashes:
             return
-        entry = self._filtered[self._highlight]
-        self._result_action = f"apply:{entry.stash_id}"
-        self.exit(self._result_action)
+        entry = self._stashes[self._highlight]
+        self.exit(f"apply:{entry.stash_id}")
 
     def action_drop_stash(self) -> None:
-        if not self._filtered:
+        if not self._stashes:
             return
-        entry = self._filtered[self._highlight]
-        self._result_action = f"drop:{entry.stash_id}"
-        self.exit(self._result_action)
-
-    def action_search(self) -> None:
-        search_bar = self.query_one("#search-bar", Input)
-        search_bar.add_class("visible")
-        search_bar.focus()
-        self._search_active = True
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        query = event.value.strip().lower()
-        search_bar = self.query_one("#search-bar", Input)
-        search_bar.remove_class("visible")
-        self._search_active = False
-
-        if query:
-            self._filtered = [
-                s for s in self._stashes
-                if query in s.message.lower() or query in s.branch.lower()
-            ]
-        else:
-            self._filtered = list(self._stashes)
-        self._highlight = 0
-        self._render_list()
-        if self._filtered:
-            self._load_diff_for_current()
-        self.query_one("#stash-list", ListView).focus()
+        entry = self._stashes[self._highlight]
+        self.exit(f"drop:{entry.stash_id}")
 
     def action_focus_diff(self) -> None:
         self.query_one("#diff-preview", RichLog).focus()
 
     def action_quit_app(self) -> None:
-        if self._search_active:
-            search_bar = self.query_one("#search-bar", Input)
-            search_bar.remove_class("visible")
-            search_bar.value = ""
-            self._search_active = False
-            self._filtered = list(self._stashes)
-            self._render_list()
-            self.query_one("#stash-list", ListView).focus()
-        else:
-            self.exit(None)
+        self.exit(None)
 
 
 def launch_shelf_browser() -> str | None:
