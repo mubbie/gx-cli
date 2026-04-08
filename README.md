@@ -27,23 +27,40 @@ Requires Python 3.9+.
 
 ## Commands
 
+**Everyday:**
+
 | Command | Description |
 |---------|-------------|
 | [`gx undo`](#gx-undo) | Smart undo — figures out what to undo |
 | [`gx redo`](#gx-undo) | Redo the last undo |
-| [`gx who`](#gx-who) | Who knows this code best |
-| [`gx nuke`](#gx-nuke) | Delete branches |
-| [`gx recap`](#gx-recap) | What did I (or my team) do recently |
-| [`gx sweep`](#gx-sweep) | Clean up merged branches and stale refs |
 | [`gx oops`](#gx-oops) | Quick-fix the last commit |
+| [`gx switch`](#gx-switch) | Branch switcher with search |
 | [`gx context`](#gx-context) | Repo status at a glance |
+| [`gx sweep`](#gx-sweep) | Clean up merged branches and stale refs |
+
+**Insight:**
+
+| Command | Description |
+|---------|-------------|
+| [`gx who`](#gx-who) | Who knows this code best |
+| [`gx recap`](#gx-recap) | What did I (or my team) do recently |
 | [`gx drift`](#gx-drift) | How far you've diverged from the HEAD branch |
-| [`gx switch`](#gx-switch) | Fuzzy branch switcher |
 | [`gx conflicts`](#gx-conflicts) | Preview merge conflicts before merging |
+
+**Stacking:**
+
+| Command | Description |
+|---------|-------------|
 | [`gx stack`](#gx-stack) | Create a stacked branch with tracked parent |
 | [`gx sync`](#gx-sync) | Rebase and push a chain of stacked branches |
 | [`gx retarget`](#gx-retarget) | Rebase a branch onto a new base |
 | [`gx graph`](#gx-graph) | Visualize the branch stack tree |
+
+**Utility:**
+
+| Command | Description |
+|---------|-------------|
+| [`gx nuke`](#gx-nuke) | Delete branches with confidence |
 | `gx update` | Update gx to the latest version |
 
 ---
@@ -165,7 +182,7 @@ Branch: feature/old-auth
 
 ## gx recap
 
-Show what you (or someone else) did recently across one or more repos.
+Show what you (or someone else) did recently.
 
 ```
 gx recap                 # Your commits in the last 24 hours
