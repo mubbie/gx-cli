@@ -105,7 +105,7 @@ $ gx who src/auth/login.ts
 Ownership of src/auth/login.ts (142 lines):
 
   #   Author              Lines    %      Last Edit
-  1   Sarah Chen          68       47.9%  3 days ago
+  1   Kim Choi          68       47.9%  3 days ago
   2   You                 42       29.6%  1 hour ago
   3   James Wilson        32       22.5%  2 weeks ago
 ```
@@ -167,7 +167,7 @@ Show what you (or someone else) did recently across one or more repos.
 
 ```
 gx recap                 # Your commits in the last 24 hours
-gx recap @kim          # Sarah's commits in the last 24 hours
+gx recap @kim          # Kim's commits in the last 24 hours
 gx recap --all           # Whole team's activity in the last 24 hours
 gx recap -d 7            # Last 7 days
 ```
