@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "gx-git"
 version = "0.2.1"
-description = "Git Productivity Toolkit — 10 focused commands for daily git friction"
+description = "Git Productivity Toolkit"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
