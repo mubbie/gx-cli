@@ -35,8 +35,8 @@ def _history_path() -> Path:
     try:
         root = get_repo_root()
     except GitError:
-        return Path(".git/gx_undo_history.json")
-    return Path(root) / ".git" / "gx_undo_history.json"
+        return Path(".git/gx/undo_history.json")
+    return Path(root) / ".git" / "gx" / "undo_history.json"
 
 
 def _load_history() -> list[dict]:
@@ -52,6 +52,7 @@ def _load_history() -> list[dict]:
 
 def _save_history(entries: list[dict]) -> None:
     path = _history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
     entries = entries[-UNDO_HISTORY_MAX_ENTRIES:]
     path.write_text(json.dumps({"entries": entries}, indent=2), encoding="utf-8")
 
