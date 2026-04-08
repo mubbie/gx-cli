@@ -154,4 +154,4 @@ def run_switch_tui(branches: list[dict], head_branch: str) -> str | None:
     """Run the Textual TUI and return the selected branch name."""
     app = SwitchApp(branches, head_branch)
     result = app.run()
-    return result
+    return str(result) if result is not None else None
