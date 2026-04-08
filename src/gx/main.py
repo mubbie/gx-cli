@@ -25,9 +25,8 @@ from gx.commands import (
 
 app = typer.Typer(
     name="gx",
-    help="gx \u2014 Git Productivity Toolkit",
     add_completion=False,
-    no_args_is_help=True,
+    invoke_without_command=True,
     rich_markup_mode="rich",
 )
 
@@ -57,16 +56,39 @@ app.command()(nuke.nuke)
 app.command()(update.update)
 
 
+_GROUPED_HELP = """\
+gx \u2014 Git Productivity Toolkit
+
+Everyday:
+  undo, redo, oops, switch, context, sweep
+
+Insight:
+  who, recap, drift, conflicts
+
+Stacking:
+  stack, sync, retarget, graph
+
+Utility:
+  nuke, update
+
+Run gx <command> --help for details.\
+"""
+
+
 def version_callback(value: bool) -> None:
     if value:
         typer.echo(f"gx {__version__}")
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", "-V", help="Show version and exit.", callback=version_callback, is_eager=True
     ),
 ) -> None:
     """gx \u2014 Git Productivity Toolkit"""
+    if ctx.invoked_subcommand is None:
+        typer.echo(_GROUPED_HELP)
+        raise typer.Exit()
