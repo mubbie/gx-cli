@@ -19,6 +19,8 @@ def run_git(args: list[str], cwd: str | None = None, check: bool = True) -> str:
             text=True,
             cwd=cwd,
             timeout=30,
+            encoding="utf-8",
+            errors="replace",
         )
         if check and result.returncode != 0:
             stderr = result.stderr.strip()
