@@ -347,26 +347,32 @@ Files diverged: 8 modified, 2 added
 
 ## gx switch
 
-Fuzzy-find branch switcher with rich context.
+Branch switcher with search.
 
 ```
-gx switch       # Interactive fuzzy branch picker
+gx switch       # Interactive branch picker
 gx switch -     # Switch to previous branch
 ```
 
-Shows all local branches with last commit date and author. Type to search, pick by number, or cancel.
+Lists all local branches sorted by recent activity. Enter a number to switch, type text to filter the list, `q` to cancel.
 
 ```
 $ gx switch
-
-Select a branch:
 
     1  feature/payments                          2h ago          kim
     2  fix/login-bug                             5h ago          you
     3  feature/auth-v2                           3d ago          james
     4  feature/search                            1d ago          you
 
-Search or pick [1-4] (q to cancel):
+Enter a number to switch, text to filter, q to cancel
+> auth
+
+    1  feature/auth-v2                           3d ago          james
+
+Enter a number to switch, text to filter, q to cancel
+> 1
+
+✓ Switched to feature/auth-v2
 ```
 
 ---

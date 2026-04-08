@@ -44,9 +44,6 @@ def _get_branches_with_info() -> list[dict]:
 
 def _pick_branch(branches: list[dict]) -> str | None:
     """Interactive branch picker with search support."""
-    console.print()
-    console.print("[bold]Select a branch:[/bold]")
-
     query = ""
     while True:
         filtered = [b for b in branches if query in b["name"].lower()] if query else branches
@@ -61,8 +58,12 @@ def _pick_branch(branches: list[dict]) -> str | None:
 
         console.print()
         try:
-            prompt = f"Search or pick [1-{len(filtered)}]" if filtered else "Search"
-            choice = console.input(f"{prompt} (q to cancel): ").strip()
+            if filtered:
+                hint = "[dim]Enter a number to switch, text to filter, q to cancel[/dim]"
+            else:
+                hint = "[dim]Enter text to filter, q to cancel[/dim]"
+            console.print(hint)
+            choice = console.input("> ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print()
             return None
@@ -70,7 +71,7 @@ def _pick_branch(branches: list[dict]) -> str | None:
         if choice.lower() == "q" or choice == "":
             return None
 
-        # Try as a number
+        # Try as a number selection
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(filtered):
@@ -80,7 +81,7 @@ def _pick_branch(branches: list[dict]) -> str | None:
         except ValueError:
             pass
 
-        # Otherwise treat as search query
+        # Otherwise treat as search filter
         query = choice.lower()
 
 
