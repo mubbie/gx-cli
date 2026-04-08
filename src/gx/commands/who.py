@@ -92,10 +92,12 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
 
     rows = []
     for i, c in enumerate(contributors[:n], 1):
-        display_name = "You" if c["name"] == current_user else c["name"]
-        if show_email and c["email"]:
-            display_name += f" <{c['email']}>"
-        last_active = _get_author_last_edit(c["name"], ".")
+        name = str(c["name"])
+        email_addr = str(c["email"])
+        display_name = "You" if name == current_user else name
+        if show_email and email_addr:
+            display_name += f" <{email_addr}>"
+        last_active = _get_author_last_edit(name, ".")
         rows.append([str(i), display_name, str(c["commits"]), last_active])
 
     console.print()

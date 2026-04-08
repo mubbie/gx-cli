@@ -19,7 +19,7 @@ from gx.utils.git import (
 
 def _parse_merge_tree_conflicts(output: str) -> list[dict]:
     """Parse git merge-tree output for conflict markers."""
-    conflicts = []
+    conflicts: list[dict] = []
 
     # merge-tree output contains conflict sections
     # Look for lines indicating conflicted files

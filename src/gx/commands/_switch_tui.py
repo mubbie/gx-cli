@@ -23,7 +23,6 @@ class BranchItem(Static):
         self.add_class("branch-item")
 
     def on_click(self) -> None:
-        self.app.selected = self.branch["name"]
         self.app.exit(self.branch["name"])
 
 
@@ -68,7 +67,6 @@ class SwitchApp(App):
         ("enter", "select", "Select"),
     ]
 
-    selected: str | None = None
     highlight_index: reactive[int] = reactive(0)
 
     def __init__(self, branches: list[dict], head_branch: str) -> None:
@@ -130,11 +128,9 @@ class SwitchApp(App):
     def action_select(self) -> None:
         if self.filtered_branches:
             idx = min(self.highlight_index, len(self.filtered_branches) - 1)
-            self.selected = self.filtered_branches[idx]["name"]
-            self.exit(self.selected)
+            self.exit(self.filtered_branches[idx]["name"])
 
-    def action_quit(self) -> None:
-        self.selected = None
+    async def action_quit(self) -> None:  # type: ignore[override]
         self.exit(None)
 
     @work(thread=True)

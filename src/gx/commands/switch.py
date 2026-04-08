@@ -133,7 +133,7 @@ def _fallback_picker(branches: list[dict]) -> str | None:
             return None
         idx = int(choice.strip()) - 1
         if 0 <= idx < len(branches):
-            return branches[idx]["name"]
+            return str(branches[idx]["name"])
         return None
     except (ValueError, EOFError, KeyboardInterrupt):
         return None

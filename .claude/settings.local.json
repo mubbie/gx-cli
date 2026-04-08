@@ -21,7 +21,8 @@
       "Bash(gx:*)",
       "Bash(git pull:*)",
       "Bash(gh run:*)",
-      "Bash(ruff check:*)"
+      "Bash(ruff check:*)",
+      "Bash(mypy:*)"
     ]
   }
 }

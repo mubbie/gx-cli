@@ -45,7 +45,7 @@ def _load_history() -> list[dict]:
         return []
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data.get("entries", [])
+        return list(data.get("entries", []))
     except (json.JSONDecodeError, OSError):
         return []
 
