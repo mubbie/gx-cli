@@ -1,4 +1,4 @@
-# gx — Git Productivity Toolkit
+# gx
 
 [![CI](https://github.com/mubbie/gx-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/mubbie/gx-cli/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/gx-git)](https://pypi.org/project/gx-git/)
