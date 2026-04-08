@@ -36,7 +36,7 @@ Requires Python 3.9+.
 | [`gx undo`](#gx-undo) | Smart undo — figures out what to undo |
 | [`gx redo`](#gx-undo) | Redo the last undo |
 | [`gx who`](#gx-who) | Who knows this code best |
-| [`gx nuke`](#gx-nuke) | Delete branches with confidence |
+| [`gx nuke`](#gx-nuke) | Delete branches |
 | [`gx recap`](#gx-recap) | What did I (or my team) do recently |
 | [`gx sweep`](#gx-sweep) | Clean up merged branches and stale refs |
 | [`gx oops`](#gx-oops) | Quick-fix the last commit |
@@ -124,7 +124,7 @@ Directory-level analysis runs blame concurrently across files. Capped at 200 fil
 
 ## gx nuke
 
-Delete branches with confidence — local, remote, and tracking refs.
+Delete branches (local, remote, and tracking refs).
 
 ```
 gx nuke feature/old-thing          # Delete local + remote + tracking
