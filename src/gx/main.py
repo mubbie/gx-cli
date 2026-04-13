@@ -55,6 +55,8 @@ app.command()(retarget.retarget)
 app.command()(graph.graph)
 app.command()(navigate.up)
 app.command()(navigate.down)
+app.command()(navigate.top)
+app.command()(navigate.bottom)
 
 # Utility
 app.command()(nuke.nuke)
@@ -71,7 +73,7 @@ Insight:
   who, recap, drift, conflicts
 
 Stacking:
-  stack, sync, retarget, graph, up, down
+  stack, sync, retarget, graph, up, down, top, bottom
 
 Utility:
   nuke, update

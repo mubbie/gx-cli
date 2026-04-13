@@ -107,3 +107,57 @@ def test_down_not_git_repo(tmp_path):
     os.chdir(tmp_path)
     result = runner.invoke(app, ["down"])
     assert result.exit_code != 0
+
+
+def test_top(stacked_repo):
+    os.chdir(stacked_repo)
+    # On feature/a, top should be feature/b
+    result = runner.invoke(app, ["top"])
+    assert result.exit_code == 0
+    assert "feature/b" in result.output
+    assert "Jumped to top" in result.output
+
+
+def test_top_already_at_top(stacked_repo):
+    os.chdir(stacked_repo)
+    run_git(["checkout", "feature/b"], cwd=stacked_repo)
+    result = runner.invoke(app, ["top"])
+    assert result.exit_code == 0
+    assert "Already at the top" in result.output
+
+
+def test_bottom_from_top(stacked_repo):
+    os.chdir(stacked_repo)
+    run_git(["checkout", "feature/b"], cwd=stacked_repo)
+    result = runner.invoke(app, ["bottom"])
+    assert result.exit_code == 0
+    assert "feature/a" in result.output
+    assert "Jumped to bottom" in result.output
+
+
+def test_bottom_already_at_bottom(stacked_repo):
+    os.chdir(stacked_repo)
+    # feature/a is the bottom (parent is main)
+    result = runner.invoke(app, ["bottom"])
+    assert result.exit_code == 0
+    assert "Already at the bottom" in result.output
+
+
+def test_bottom_from_trunk(stacked_repo):
+    os.chdir(stacked_repo)
+    run_git(["checkout", "main"], cwd=stacked_repo)
+    result = runner.invoke(app, ["bottom"])
+    assert result.exit_code == 0
+    assert "feature/a" in result.output
+
+
+def test_top_not_git_repo(tmp_path):
+    os.chdir(tmp_path)
+    result = runner.invoke(app, ["top"])
+    assert result.exit_code != 0
+
+
+def test_bottom_not_git_repo(tmp_path):
+    os.chdir(tmp_path)
+    result = runner.invoke(app, ["bottom"])
+    assert result.exit_code != 0
