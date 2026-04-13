@@ -24,7 +24,7 @@ from gx.utils.git import (
     run_git,
     supports_update_refs,
 )
-from gx.utils.stack import get_descendants, get_stack_chain
+from gx.utils.stack import get_descendants, get_stack_chain, topo_sort, update_parent_head
 
 
 def _sync_with_update_refs(chain: list[str]) -> bool:
@@ -188,7 +188,7 @@ def sync(
             print_info("No stack detected for the current branch.")
             raise typer.Exit(0)
     elif branches:
-        chain = list(branches)
+        chain = topo_sort(list(branches))
     else:
         # Interactive: show the stack and let user confirm
         chain = _auto_detect_chain()
@@ -244,6 +244,14 @@ def sync(
         success = _sync_with_onto(chain)
 
     if success:
+        # Update parent_head for each synced branch
+        for i, branch in enumerate(sync_branches):
+            parent = chain[i]
+            try:
+                new_head = run_git(["rev-parse", parent])
+                update_parent_head(branch, new_head)
+            except GitError:
+                pass
         _push_branches(sync_branches)
         console.print()
         print_success(f"Stack sync complete. {len(sync_branches)} branches updated.")

@@ -10,6 +10,7 @@ from gx.commands import (
     context,
     drift,
     graph,
+    navigate,
     nuke,
     oops,
     recap,
@@ -52,6 +53,8 @@ app.command(name="stack")(stack_cmd.stack)
 app.command()(sync.sync)
 app.command()(retarget.retarget)
 app.command()(graph.graph)
+app.command()(navigate.up)
+app.command()(navigate.down)
 
 # Utility
 app.command()(nuke.nuke)
@@ -68,7 +71,7 @@ Insight:
   who, recap, drift, conflicts
 
 Stacking:
-  stack, sync, retarget, graph
+  stack, sync, retarget, graph, up, down
 
 Utility:
   nuke, update

@@ -26,37 +26,33 @@ def stacked_repo(tmp_path):
     git("config", "user.name", "Test User")
     git("config", "user.email", "test@example.com")
 
-    # Initial commit on main
     (repo / "README.md").write_text("# Test\n")
     git("add", "README.md")
     git("commit", "-m", "Initial commit")
 
-    # feature/a on top of main
     git("checkout", "-b", "feature/a")
     (repo / "a.py").write_text("# Feature A\n")
     git("add", "a.py")
     git("commit", "-m", "Add feature A")
 
-    # feature/b on top of feature/a
     git("checkout", "-b", "feature/b")
     (repo / "b.py").write_text("# Feature B\n")
     git("add", "b.py")
     git("commit", "-m", "Add feature B")
 
-    # feature/c on top of feature/b
     git("checkout", "-b", "feature/c")
     (repo / "c.py").write_text("# Feature C\n")
     git("add", "c.py")
     git("commit", "-m", "Add feature C")
 
-    # Write stack.json
+    # Write new-format stack.json
     gx_dir = repo / ".git" / "gx"
     gx_dir.mkdir(parents=True, exist_ok=True)
     config = {
-        "relationships": {
-            "feature/a": "main",
-            "feature/b": "feature/a",
-            "feature/c": "feature/b",
+        "branches": {
+            "feature/a": {"parent": "main", "parent_head": "abc123"},
+            "feature/b": {"parent": "feature/a", "parent_head": "def456"},
+            "feature/c": {"parent": "feature/b", "parent_head": "ghi789"},
         },
         "metadata": {"main_branch": "main"},
     }
@@ -71,8 +67,8 @@ def test_load_stack_config(stacked_repo):
     from gx.utils.stack import load_stack_config
 
     config = load_stack_config()
-    assert "feature/a" in config["relationships"]
-    assert config["relationships"]["feature/a"] == "main"
+    assert "feature/a" in config["branches"]
+    assert config["branches"]["feature/a"]["parent"] == "main"
 
 
 def test_load_missing_config(git_repo):
@@ -80,7 +76,32 @@ def test_load_missing_config(git_repo):
     from gx.utils.stack import load_stack_config
 
     config = load_stack_config()
-    assert config["relationships"] == {}
+    assert config["branches"] == {}
+
+
+def test_migration_from_old_format(git_repo):
+    """Test auto-migration from old relationships format."""
+    os.chdir(git_repo)
+    # Create a branch so merge-base works
+    run_git(["checkout", "-b", "feature/x"], cwd=git_repo)
+    (git_repo / "x.py").write_text("x\n")
+    run_git(["add", "x.py"], cwd=git_repo)
+    run_git(["commit", "-m", "x"], cwd=git_repo)
+    run_git(["checkout", "main"], cwd=git_repo)
+
+    # Write old-format config
+    gx_dir = git_repo / ".git" / "gx"
+    gx_dir.mkdir(parents=True, exist_ok=True)
+    old_config = {"relationships": {"feature/x": "main"}, "metadata": {"main_branch": "main"}}
+    (gx_dir / "stack.json").write_text(json.dumps(old_config))
+
+    from gx.utils.stack import load_stack_config
+
+    config = load_stack_config()
+    assert "branches" in config
+    assert "relationships" not in config
+    assert config["branches"]["feature/x"]["parent"] == "main"
+    assert config["branches"]["feature/x"]["parent_head"] != ""
 
 
 def test_record_relationship(git_repo):
@@ -89,7 +110,8 @@ def test_record_relationship(git_repo):
 
     record_relationship("feature/x", "main")
     config = load_stack_config()
-    assert config["relationships"]["feature/x"] == "main"
+    assert config["branches"]["feature/x"]["parent"] == "main"
+    assert config["branches"]["feature/x"]["parent_head"] != ""
 
 
 def test_get_parent(stacked_repo):
@@ -99,6 +121,14 @@ def test_get_parent(stacked_repo):
     assert get_parent("feature/a") == "main"
     assert get_parent("feature/b") == "feature/a"
     assert get_parent("nonexistent") is None
+
+
+def test_get_parent_head(stacked_repo):
+    os.chdir(stacked_repo)
+    from gx.utils.stack import get_parent_head
+
+    assert get_parent_head("feature/a") == "abc123"
+    assert get_parent_head("nonexistent") is None
 
 
 def test_get_children(stacked_repo):
@@ -126,6 +156,17 @@ def test_get_descendants(stacked_repo):
     assert "feature/c" in desc
 
 
+def test_topo_sort(stacked_repo):
+    os.chdir(stacked_repo)
+    from gx.utils.stack import topo_sort
+
+    # Provide branches out of order
+    result = topo_sort(["feature/c", "feature/a", "main", "feature/b"])
+    assert result.index("main") < result.index("feature/a")
+    assert result.index("feature/a") < result.index("feature/b")
+    assert result.index("feature/b") < result.index("feature/c")
+
+
 def test_remove_branch(stacked_repo):
     os.chdir(stacked_repo)
     from gx.utils.stack import get_parent, remove_branch
@@ -136,7 +177,6 @@ def test_remove_branch(stacked_repo):
 
 def test_clean_deleted_branches(stacked_repo):
     os.chdir(stacked_repo)
-    # Delete feature/c locally
     run_git(["branch", "-D", "feature/c"], cwd=stacked_repo)
 
     from gx.utils.stack import clean_deleted_branches, get_parent
@@ -153,3 +193,25 @@ def test_build_branch_stack(stacked_repo):
     assert stack.main_branch == "main"
     assert "main" in stack.all_nodes
     assert "feature/a" in stack.all_nodes
+
+
+def test_cycle_detection(stacked_repo):
+    """Cycle in config should not infinite-loop."""
+    os.chdir(stacked_repo)
+
+    # Write a cyclic config
+    gx_dir = stacked_repo / ".git" / "gx"
+    config = {
+        "branches": {
+            "feature/a": {"parent": "feature/b", "parent_head": "x"},
+            "feature/b": {"parent": "feature/a", "parent_head": "y"},
+        },
+        "metadata": {"main_branch": "main"},
+    }
+    (gx_dir / "stack.json").write_text(json.dumps(config))
+
+    from gx.utils.stack import get_stack_chain
+
+    # Should not hang — cycle guard breaks the loop
+    chain = get_stack_chain("feature/a")
+    assert len(chain) <= 3  # At most a, b, a would be caught

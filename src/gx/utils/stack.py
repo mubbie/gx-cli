@@ -21,6 +21,13 @@ from gx.utils.git import (
 # ---------------------------------------------------------------------------
 
 @dataclass
+class BranchMeta:
+    parent: str
+    parent_head: str
+    pr_number: int | None = None
+
+
+@dataclass
 class BranchNode:
     name: str
     commit_sha: str = ""
@@ -52,20 +59,36 @@ def _config_path() -> Path:
     return Path(root) / ".git" / "gx" / "stack.json"
 
 
+def _migrate_config(data: dict) -> dict:
+    """Migrate old 'relationships' format to new 'branches' format."""
+    if "relationships" in data and "branches" not in data:
+        branches: dict[str, dict] = {}
+        for child, parent in data["relationships"].items():
+            try:
+                parent_head = run_git(["merge-base", child, parent])
+            except GitError:
+                parent_head = ""
+            branches[child] = {"parent": parent, "parent_head": parent_head}
+        data["branches"] = branches
+        del data["relationships"]
+    return data
+
+
 def load_stack_config() -> dict:
     """Load .git/gx/stack.json. Returns empty config if missing."""
     path = _config_path()
     if not path.exists():
-        return {"relationships": {}, "metadata": {"main_branch": get_head_branch()}}
+        return {"branches": {}, "metadata": {"main_branch": get_head_branch()}}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        if "relationships" not in data:
-            data["relationships"] = {}
+        data = _migrate_config(data)
+        if "branches" not in data:
+            data["branches"] = {}
         if "metadata" not in data:
             data["metadata"] = {"main_branch": get_head_branch()}
         return dict(data)
     except (json.JSONDecodeError, OSError):
-        return {"relationships": {}, "metadata": {"main_branch": get_head_branch()}}
+        return {"branches": {}, "metadata": {"main_branch": get_head_branch()}}
 
 
 def save_stack_config(config: dict) -> None:
@@ -78,38 +101,65 @@ def save_stack_config(config: dict) -> None:
 
 
 def record_relationship(child: str, parent: str) -> None:
-    """Add or update a parent-child relationship."""
+    """Add or update a parent-child relationship with parent_head."""
     config = load_stack_config()
-    config["relationships"][child] = parent
+    try:
+        parent_head = run_git(["rev-parse", parent])
+    except GitError:
+        parent_head = ""
+    config["branches"][child] = {"parent": parent, "parent_head": parent_head}
     save_stack_config(config)
 
 
-def get_parent(branch: str) -> str | None:
-    """Return the parent branch, or None."""
+def update_parent_head(child: str, new_parent_head: str) -> None:
+    """Update the parent_head for a branch after sync/retarget."""
     config = load_stack_config()
-    result = config["relationships"].get(branch)
-    return str(result) if result is not None else None
+    if child in config["branches"]:
+        config["branches"][child]["parent_head"] = new_parent_head
+        save_stack_config(config)
+
+
+def get_parent(branch: str) -> str | None:
+    """Return the parent branch name, or None."""
+    config = load_stack_config()
+    entry = config["branches"].get(branch)
+    if entry is None:
+        return None
+    return str(entry["parent"])
+
+
+def get_parent_head(branch: str) -> str | None:
+    """Return the stored parent_head SHA for a branch, or None."""
+    config = load_stack_config()
+    entry = config["branches"].get(branch)
+    if entry is None:
+        return None
+    head = entry.get("parent_head", "")
+    return str(head) if head else None
 
 
 def get_children(branch: str) -> list[str]:
     """Return all branches that have this branch as their parent."""
     config = load_stack_config()
-    return [child for child, parent in config["relationships"].items() if parent == branch]
+    return [
+        child for child, meta in config["branches"].items()
+        if meta.get("parent") == branch
+    ]
 
 
 def get_stack_chain(branch: str) -> list[str]:
     """Walk up from branch to root, return the full chain ordered root-first."""
     config = load_stack_config()
-    rels = config["relationships"]
+    branches = config["branches"]
     chain = [branch]
+    visited: set[str] = {branch}
     current = branch
-    seen: set[str] = {branch}
-    while current in rels:
-        parent = rels[current]
-        if parent in seen:
-            break  # cycle guard
+    while current in branches:
+        parent = branches[current]["parent"]
+        if parent in visited:
+            break
+        visited.add(parent)
         chain.append(parent)
-        seen.add(parent)
         current = parent
     chain.reverse()
     return chain
@@ -118,16 +168,19 @@ def get_stack_chain(branch: str) -> list[str]:
 def get_descendants(branch: str) -> list[str]:
     """Walk down from branch, return all descendants in topological order."""
     config = load_stack_config()
-    rels = config["relationships"]
-    # Build child map
+    branches = config["branches"]
     child_map: dict[str, list[str]] = {}
-    for child, parent in rels.items():
-        child_map.setdefault(parent, []).append(child)
+    for child, meta in branches.items():
+        child_map.setdefault(meta["parent"], []).append(child)
 
     result: list[str] = []
+    visited: set[str] = {branch}
 
     def _walk(node: str) -> None:
-        for child in child_map.get(node, []):
+        for child in sorted(child_map.get(node, [])):
+            if child in visited:
+                continue
+            visited.add(child)
             result.append(child)
             _walk(child)
 
@@ -135,28 +188,58 @@ def get_descendants(branch: str) -> list[str]:
     return result
 
 
-def remove_branch(branch: str) -> None:
-    """Remove a branch from relationships (both as child and parent)."""
+def topo_sort(branches_list: list[str]) -> list[str]:
+    """Sort branches so parents always come before children (Kahn's algorithm)."""
     config = load_stack_config()
-    rels = config["relationships"]
-    rels.pop(branch, None)
-    # Orphan any children
-    for child, parent in list(rels.items()):
-        if parent == branch:
-            del rels[child]
+    branches = config["branches"]
+    branch_set = set(branches_list)
+
+    children_of: dict[str, list[str]] = {b: [] for b in branches_list}
+    in_degree: dict[str, int] = {b: 0 for b in branches_list}
+
+    for branch in branches_list:
+        if branch in branches:
+            parent = branches[branch]["parent"]
+            if parent in branch_set:
+                children_of.setdefault(parent, []).append(branch)
+                in_degree[branch] += 1
+
+    queue = sorted([b for b in branches_list if in_degree[b] == 0])
+    result: list[str] = []
+
+    while queue:
+        current = queue.pop(0)
+        result.append(current)
+        for child in sorted(children_of.get(current, [])):
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                queue.append(child)
+
+    if len(result) != len(branches_list):
+        missing = set(branches_list) - set(result)
+        result.extend(sorted(missing))
+
+    return result
+
+
+def remove_branch(branch: str) -> None:
+    """Remove a branch from config (both as child and parent)."""
+    config = load_stack_config()
+    branches = config["branches"]
+    branches.pop(branch, None)
+    for child, meta in list(branches.items()):
+        if meta.get("parent") == branch:
+            del branches[child]
     save_stack_config(config)
 
 
 def clean_deleted_branches() -> None:
     """Remove entries for branches that no longer exist locally."""
     config = load_stack_config()
-    rels = config["relationships"]
-    to_remove = []
-    for child in list(rels.keys()):
-        if not branch_exists(child):
-            to_remove.append(child)
+    branches = config["branches"]
+    to_remove = [child for child in branches if not branch_exists(child)]
     for branch in to_remove:
-        del rels[branch]
+        del branches[branch]
     if to_remove:
         save_stack_config(config)
 
@@ -169,7 +252,7 @@ def build_branch_stack() -> BranchStack:
     """Construct the full branch hierarchy with self-healing."""
     main = get_head_branch()
     config = load_stack_config()
-    rels = config["relationships"]
+    branches = config["branches"]
 
     # Step 1: Get all local branches with SHAs
     fmt = "%(refname:short)\t%(objectname)"
@@ -184,21 +267,24 @@ def build_branch_stack() -> BranchStack:
         return BranchStack(main_branch=main)
 
     # Step 2: Clean stale entries
-    for child in list(rels.keys()):
+    for child in list(branches.keys()):
         if child not in branch_shas:
-            del rels[child]
+            del branches[child]
 
-    # Step 3: Self-heal — detect parents for branches without relationships
+    # Step 3: Self-heal unknown branches
     config_changed = False
     for branch in branch_shas:
         if branch == main:
             continue
-        if branch in rels and rels[branch] in branch_shas:
+        if branch in branches and branches[branch]["parent"] in branch_shas:
             continue
-        # Try to detect parent via merge-base closeness
         detected = _detect_parent(branch, main, branch_shas)
         if detected:
-            rels[branch] = detected
+            try:
+                parent_head = run_git(["merge-base", branch, detected])
+            except GitError:
+                parent_head = ""
+            branches[branch] = {"parent": detected, "parent_head": parent_head}
             config_changed = True
 
     if config_changed:
@@ -212,19 +298,22 @@ def build_branch_stack() -> BranchStack:
 
     nodes: dict[str, BranchNode] = {}
     for name, sha in branch_shas.items():
-        nodes[name] = BranchNode(
-            name=name,
-            commit_sha=sha,
-            is_head=(name == current),
-        )
+        nodes[name] = BranchNode(name=name, commit_sha=sha, is_head=(name == current))
 
-    # Step 5: Wire up parent-child links
-    for child_name, parent_name in rels.items():
+    # Step 5: Wire up parent-child links (with cycle detection)
+    visited_edges: set[str] = set()
+    for child_name, meta in branches.items():
+        parent_name = meta["parent"]
+        edge = f"{child_name}->{parent_name}"
+        if edge in visited_edges:
+            continue
+        visited_edges.add(edge)
         if child_name in nodes and parent_name in nodes:
             nodes[parent_name].children.append(nodes[child_name])
 
-    # Step 6: Calculate ahead/behind for each relationship
-    for child_name, parent_name in rels.items():
+    # Step 6: Calculate ahead/behind
+    for child_name, meta in branches.items():
+        parent_name = meta["parent"]
         if child_name not in nodes or parent_name not in nodes:
             continue
         try:
@@ -237,8 +326,6 @@ def build_branch_stack() -> BranchStack:
             nodes[child_name].behind = int(behind)
         except (GitError, ValueError):
             pass
-
-        # Check if merged
         try:
             merged_out = run_git(["branch", "--merged", parent_name], check=False)
             merged_names = [b.strip().lstrip("* ") for b in merged_out.splitlines()]
@@ -248,53 +335,47 @@ def build_branch_stack() -> BranchStack:
             pass
 
     # Step 7: Classify roots and orphans
-    children_in_rels = set(rels.keys())
+    children_in_config = set(branches.keys())
     roots: list[BranchNode] = []
     orphans: list[BranchNode] = []
 
     for name, node in nodes.items():
-        if name not in children_in_rels:
+        if name not in children_in_config:
             if node.children or name == main:
                 roots.append(node)
             elif name != main:
                 node.is_orphan = True
                 orphans.append(node)
 
-    # Ensure main is first root
     roots.sort(key=lambda n: (n.name != main, n.name))
 
-    # Sort children alphabetically at each level
-    def _sort_children(node: BranchNode) -> None:
+    def _sort_children(node: BranchNode, seen: set[str] | None = None) -> None:
+        if seen is None:
+            seen = set()
+        if node.name in seen:
+            return
+        seen.add(node.name)
         node.children.sort(key=lambda n: n.name)
         for child in node.children:
-            _sort_children(child)
+            _sort_children(child, seen)
 
     for root in roots:
         _sort_children(root)
 
-    return BranchStack(
-        roots=roots,
-        all_nodes=nodes,
-        main_branch=main,
-        orphans=orphans,
-    )
+    return BranchStack(roots=roots, all_nodes=nodes, main_branch=main, orphans=orphans)
 
 
 def _detect_parent(
-    branch: str,
-    main: str,
-    branch_shas: dict[str, str],
+    branch: str, main: str, branch_shas: dict[str, str],
 ) -> str | None:
     """Detect the most likely parent for a branch via merge-base."""
     best_parent = None
     best_distance = float("inf")
-
     for candidate in branch_shas:
         if candidate == branch:
             continue
         try:
             mb = run_git(["merge-base", branch, candidate])
-            # Distance = commits between merge-base and branch
             count_str = run_git(["rev-list", "--count", f"{mb}..{branch}"])
             distance = int(count_str)
             if distance < best_distance:
@@ -302,5 +383,4 @@ def _detect_parent(
                 best_parent = candidate
         except (GitError, ValueError):
             continue
-
     return best_parent

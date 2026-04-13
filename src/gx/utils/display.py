@@ -38,7 +38,7 @@ console = Console(
 def confirm_action(message: str) -> bool:
     """Show a yes/no confirmation prompt. Returns True if user confirms."""
     try:
-        response = console.input(f"\n? {message} [y/N] ")
+        response = console.input(f"\n? {message} \\[y/N] ")
         return response.strip().lower() in ("y", "yes")
     except (EOFError, KeyboardInterrupt):
         console.print()
@@ -46,24 +46,24 @@ def confirm_action(message: str) -> bool:
 
 
 def print_success(message: str) -> None:
-    console.print(f"[success]\u2713[/success] {message}")
+    console.print(f"[success]OK[/success] {message}")
 
 
 def print_error(message: str) -> None:
-    console.print(f"[error]\u2717[/error] {message}")
+    console.print(f"[error]ERROR[/error] {message}")
 
 
 def print_warning(message: str) -> None:
-    console.print(f"[warning]\u26a0[/warning] {message}")
+    console.print(f"[warning]WARN[/warning] {message}")
 
 
 def print_info(message: str) -> None:
-    console.print(f"[info]\u2139[/info] {message}")
+    console.print(f"[info]>[/info] {message}")
 
 
 def print_dry_run(actions: list[str]) -> None:
     console.print()
-    console.print("[dry_run]DRY RUN \u2014 no changes will be made[/dry_run]")
+    console.print("[dry_run]DRY RUN -- no changes will be made[/dry_run]")
     console.print()
     for action in actions:
         console.print(f"  {action}")

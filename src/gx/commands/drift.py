@@ -48,6 +48,7 @@ def _get_commits_between(from_ref: str, to_ref: str, limit: int | None = None) -
 def drift(
     target: str = typer.Argument(None, help="Branch to compare against (default: HEAD branch)."),
     full: bool = typer.Option(False, "--full", help="Show all commits (no truncation)."),
+    parent: bool = typer.Option(False, "--parent", "-p", help="Compare against stack parent."),
 ) -> None:
     """Show how far your branch has diverged from the HEAD branch."""
     try:
@@ -62,7 +63,19 @@ def drift(
         print_error(str(e))
         raise typer.Exit(1)
 
-    target_branch = target or get_head_branch()
+    if parent and target:
+        print_error("Cannot use --parent with an explicit target branch.")
+        raise typer.Exit(1)
+
+    if parent:
+        from gx.utils.stack import get_parent as stack_get_parent
+        stack_parent = stack_get_parent(current)
+        if stack_parent is None:
+            print_error(f"{current} is not in the stack. Use `gx drift` without --parent.")
+            raise typer.Exit(1)
+        target_branch = stack_parent
+    else:
+        target_branch = target or get_head_branch()
 
     if current == target_branch:
         print_info(f"You're on {target_branch}. Switch to a feature branch to see drift.")

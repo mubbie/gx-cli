@@ -24,7 +24,7 @@ from gx.utils.git import (
     get_current_branch,
     run_git,
 )
-from gx.utils.stack import get_parent, record_relationship
+from gx.utils.stack import get_parent, get_parent_head, record_relationship
 
 
 def retarget(
@@ -60,12 +60,13 @@ def retarget(
         print_error(f"Target branch '{new_target}' does not exist.")
         raise typer.Exit(1)
 
-    # Find old parent
+    # Find old parent — prefer stored parent_head (exact SHA) for --onto
     old_parent = get_parent(branch)
-    if old_parent is None:
-        # Fallback: detect via merge-base against new_target
+    old_parent_ref = get_parent_head(branch) or old_parent
+    if old_parent_ref is None:
         try:
-            old_parent = run_git(["merge-base", branch, new_target])
+            old_parent_ref = run_git(["merge-base", branch, new_target])
+            old_parent = old_parent_ref
             print_warning(
                 f"No saved parent for {branch}. Using merge-base as old parent."
             )
@@ -94,7 +95,7 @@ def retarget(
             "",
             "Steps:",
             "  1. Fetch remote",
-            f"  2. Run: git rebase --onto {remote_target} {old_parent} {branch}",
+            f"  2. Run: git rebase --onto {remote_target} {old_parent_ref} {branch}",
             "  3. Push with --force-with-lease",
             "  4. Update stack config",
             "  5. Attempt PR retarget via gh CLI",
@@ -119,7 +120,7 @@ def retarget(
     console.print(f"  Rebasing {branch} onto {remote_target} (using --onto)...")
     try:
         result = subprocess.run(
-            ["git", "rebase", "--onto", remote_target, old_parent, branch],
+            ["git", "rebase", "--onto", remote_target, old_parent_ref, branch],
             capture_output=True,
             text=True,
             encoding="utf-8",

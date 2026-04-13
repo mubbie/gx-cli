@@ -42,7 +42,7 @@ def stacked_repo(tmp_path):
     gx_dir = repo / ".git" / "gx"
     gx_dir.mkdir(parents=True, exist_ok=True)
     config = {
-        "relationships": {"feature/a": "main"},
+        "branches": {"feature/a": {"parent": "main", "parent_head": "abc"}},
         "metadata": {"main_branch": "main"},
     }
     (gx_dir / "stack.json").write_text(json.dumps(config))

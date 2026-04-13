@@ -1,4 +1,4 @@
-"""Tests for gx sync."""
+"""Tests for gx up / gx down."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def run_git(args, cwd):
 
 @pytest.fixture
 def stacked_repo(tmp_path):
-    repo = tmp_path / "sync-repo"
+    repo = tmp_path / "nav-repo"
     repo.mkdir()
 
     def git(*args):
@@ -55,25 +55,55 @@ def stacked_repo(tmp_path):
     }
     (gx_dir / "stack.json").write_text(json.dumps(config))
 
-    git("checkout", "feature/b")
+    git("checkout", "feature/a")
     return repo
 
 
-def test_sync_dry_run(stacked_repo):
+def test_up(stacked_repo):
     os.chdir(stacked_repo)
-    result = runner.invoke(app, ["sync", "--stack", "--dry-run"])
+    result = runner.invoke(app, ["up"])
     assert result.exit_code == 0
-    assert "DRY RUN" in result.output
+    assert "Moved up" in result.output
+    assert "feature/b" in result.output
 
 
-def test_sync_not_git_repo(tmp_path):
+def test_up_at_top(stacked_repo):
+    os.chdir(stacked_repo)
+    run_git(["checkout", "feature/b"], cwd=stacked_repo)
+    result = runner.invoke(app, ["up"])
+    assert result.exit_code == 0
+    assert "top of the stack" in result.output
+
+
+def test_down(stacked_repo):
+    os.chdir(stacked_repo)
+    result = runner.invoke(app, ["down"])
+    assert result.exit_code == 0
+    assert "main" in result.output
+
+
+def test_down_to_trunk(stacked_repo):
+    os.chdir(stacked_repo)
+    result = runner.invoke(app, ["down"])
+    assert result.exit_code == 0
+    assert "trunk" in result.output
+
+
+def test_down_not_in_stack(stacked_repo):
+    os.chdir(stacked_repo)
+    run_git(["checkout", "main"], cwd=stacked_repo)
+    result = runner.invoke(app, ["down"])
+    assert result.exit_code == 0
+    assert "not in the stack" in result.output
+
+
+def test_up_not_git_repo(tmp_path):
     os.chdir(tmp_path)
-    result = runner.invoke(app, ["sync", "--stack"])
+    result = runner.invoke(app, ["up"])
     assert result.exit_code != 0
 
 
-def test_sync_no_stack(git_repo):
-    os.chdir(git_repo)
-    result = runner.invoke(app, ["sync", "--stack"])
-    assert result.exit_code == 0
-    assert "Need at least" in result.output or "No stack" in result.output
+def test_down_not_git_repo(tmp_path):
+    os.chdir(tmp_path)
+    result = runner.invoke(app, ["down"])
+    assert result.exit_code != 0
