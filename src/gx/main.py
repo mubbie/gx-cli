@@ -14,6 +14,7 @@ from gx.commands import (
     navigate,
     nuke,
     oops,
+    parent,
     recap,
     retarget,
     shelf,
@@ -59,6 +60,7 @@ app.command()(navigate.up)
 app.command()(navigate.down)
 app.command()(navigate.top)
 app.command()(navigate.bottom)
+app.command()(parent.parent)
 
 # Utility
 app.command()(nuke.nuke)
@@ -75,7 +77,7 @@ Insight:
   who, recap, drift, conflicts, handoff
 
 Stacking:
-  stack, sync, retarget, graph, up, down, top, bottom
+  stack, sync, retarget, graph, up, down, top, bottom, parent
 
 Utility:
   nuke, update

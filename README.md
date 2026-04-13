@@ -61,6 +61,7 @@ Requires Python 3.9+.
 | `gx down` | Move down the stack (to parent) |
 | `gx top` | Jump to the top of the stack |
 | `gx bottom` | Jump to the bottom of the stack |
+| `gx parent` | Print the parent branch name (for scripting) |
 
 **Utility:**
 
@@ -691,6 +692,27 @@ OK Jumped to bottom: feature/auth-v4 -> feature/auth-v1
 ```
 
 When a branch has multiple children (fork in the stack), these commands list the options and suggest `gx switch`.
+
+---
+
+## gx parent
+
+Print the parent branch name to stdout. No formatting, no Rich -- just a raw string for composability.
+
+```
+$ gx parent
+feature/auth-v1
+```
+
+Falls back to the HEAD branch (main) if the branch isn't in the stack. Exits with non-zero if already on main.
+
+Useful as a building block:
+
+```bash
+git diff $(gx parent)...HEAD        # diff against parent
+git log $(gx parent)..HEAD          # commits unique to your branch
+git rebase $(gx parent)             # manual rebase
+```
 
 ---
 
