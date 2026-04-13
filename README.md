@@ -56,6 +56,10 @@ Requires Python 3.9+.
 | [`gx sync`](#gx-sync) | Rebase and push a chain of stacked branches |
 | [`gx retarget`](#gx-retarget) | Rebase a branch onto a new base |
 | [`gx graph`](#gx-graph) | Visualize the branch stack tree |
+| `gx up` | Move up the stack (to child) |
+| `gx down` | Move down the stack (to parent) |
+| `gx top` | Jump to the top of the stack |
+| `gx bottom` | Jump to the bottom of the stack |
 
 **Utility:**
 
@@ -343,6 +347,7 @@ Show how far your branch has diverged from the HEAD branch, with commit details 
 gx drift              # Compare against HEAD branch
 gx drift develop      # Compare against a specific branch
 gx drift --full       # Show all commits (no truncation)
+gx drift --parent     # Compare against stack parent (what the PR reviewer sees)
 ```
 
 ```
@@ -365,6 +370,7 @@ Files diverged: 8 modified, 2 added
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--full` | false | Show all commits (no truncation at 20) |
+| `--parent, -p` | false | Compare against stack parent instead of main |
 
 ---
 
@@ -593,6 +599,35 @@ Relationships stored in .git/gx/stack.json
 ```
 
 The tree builder auto-discovers relationships for branches created outside of `gx` and saves them to the config, so the graph gets more accurate over time.
+
+---
+
+## Stack Navigation
+
+Navigate up and down the stack without remembering branch names.
+
+```
+gx up         # Move to child branch (one step up)
+gx down       # Move to parent branch (one step down)
+gx top        # Jump to the tip of the stack
+gx bottom     # Jump to the base of the stack
+```
+
+```
+$ gx up
+OK Moved up: feature/auth-v1 -> feature/auth-v2
+
+$ gx down
+OK Moved down: feature/auth-v2 -> feature/auth-v1
+
+$ gx top
+OK Jumped to top: feature/auth-v1 -> feature/auth-v4
+
+$ gx bottom
+OK Jumped to bottom: feature/auth-v4 -> feature/auth-v1
+```
+
+When a branch has multiple children (fork in the stack), these commands list the options and suggest `gx switch`.
 
 ---
 
