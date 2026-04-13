@@ -31,7 +31,7 @@ Requires Python 3.9+.
 
 | Command | Description |
 |---------|-------------|
-| [`gx undo`](#gx-undo) | Smart undo — figures out what to undo |
+| [`gx undo`](#gx-undo) | Smart undo -- figures out what to undo |
 | [`gx redo`](#gx-undo) | Redo the last undo |
 | [`gx oops`](#gx-oops) | Quick-fix the last commit |
 | [`gx switch`](#gx-switch) | Branch switcher with search |
@@ -74,7 +74,7 @@ Requires Python 3.9+.
 
 ## gx undo
 
-Smart undo — detects the last git action and reverses it by walking the reflog. Works regardless of whether the action was performed via `gx` or raw git commands.
+Smart undo -- detects the last git action and reverses it by walking the reflog. Works regardless of whether the action was performed via `gx` or raw git commands.
 
 ```
 gx undo              # Undo the last thing
@@ -99,7 +99,7 @@ $ gx undo
 
 Detected: commit "Add search endpoint" (a1b2c3d, 2 minutes ago)
 
-  Action:  Soft reset to previous commit — your changes will be preserved in staging.
+  Action:  Soft reset to previous commit -- your changes will be preserved in staging.
   Command: git reset --soft HEAD~1
 
 ? Proceed with undo? [y/N] y
@@ -138,7 +138,7 @@ Ownership of src/auth/login.ts (142 lines):
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-n, --number` | 5 | Number of contributors to show |
-| `--since` | — | Only consider commits after this date |
+| `--since` | -- | Only consider commits after this date |
 | `--email` | false | Show email addresses |
 | `--no-limit` | false | Remove the 200-file cap for directory analysis |
 
@@ -258,7 +258,7 @@ Summary: 2 merged, 1 likely squash-merged, 1 stale refs
 ✓ Cleanup complete.
 ```
 
-Detects squash-merged branches using `git cherry` — branches where all patches already exist on the HEAD branch are flagged as "likely squash-merged" and confirmed separately.
+Detects squash-merged branches using `git cherry` -- branches where all patches already exist on the HEAD branch are flagged as "likely squash-merged" and confirmed separately.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -271,7 +271,7 @@ Detects squash-merged branches using `git cherry` — branches where all patches
 
 ## gx oops
 
-Quick-fix the last commit — amend the message, add forgotten files, or both.
+Quick-fix the last commit -- amend the message, add forgotten files, or both.
 
 ```
 gx oops                           # Opens editor to amend message
@@ -282,7 +282,7 @@ gx oops --dry-run                 # See what would change
 ```
 
 ```
-$ gx oops --add src/auth/refresh.ts -m "Fix auth token refresh — include refresh util"
+$ gx oops --add src/auth/refresh.ts -m "Fix auth token refresh -- include refresh util"
 
 Last commit: "Fix auth token refresh" (a1b2c3d, 5 min ago)
 
@@ -291,7 +291,7 @@ Last commit: "Fix auth token refresh" (a1b2c3d, 5 min ago)
 
   Amending message:
     Before: "Fix auth token refresh"
-    After:  "Fix auth token refresh — include refresh util"
+    After:  "Fix auth token refresh -- include refresh util"
 
 ? Proceed? [y/N] y
 
@@ -300,8 +300,8 @@ Last commit: "Fix auth token refresh" (a1b2c3d, 5 min ago)
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-m, --message` | — | New commit message (skips editor) |
-| `--add` | — | File(s) to add to the last commit |
+| `-m, --message` | -- | New commit message (skips editor) |
+| `--add` | -- | File(s) to add to the last commit |
 | `--dry-run` | false | Show what would change |
 | `--force` | false | Allow amending even if already pushed |
 
@@ -311,7 +311,7 @@ Last commit: "Fix auth token refresh" (a1b2c3d, 5 min ago)
 
 ## gx context
 
-Enhanced repo status at a glance — everything you need to know about your current state.
+Enhanced repo status at a glance -- everything you need to know about your current state.
 
 ```
 gx context     # Full context summary
@@ -436,7 +436,7 @@ $ gx conflicts
 
 Checking feature/search against main...
 
-✓ No conflicts — clean merge
+✓ No conflicts -- clean merge
   12 files would be modified
 ```
 
@@ -718,9 +718,9 @@ git rebase $(gx parent)             # manual rebase
 
 ## Tech Stack
 
-- [Typer](https://typer.tiangolo.com/) — CLI framework
-- [Rich](https://rich.readthedocs.io/) — Terminal formatting (colors, tables, spinners)
-- [Textual](https://textual.textualize.io/) — TUI for interactive stash browser
+- [Typer](https://typer.tiangolo.com/) -- CLI framework
+- [Rich](https://rich.readthedocs.io/) -- Terminal formatting (colors, tables, spinners)
+- [Textual](https://textual.textualize.io/) -- TUI for interactive stash browser
 
 ## License
 

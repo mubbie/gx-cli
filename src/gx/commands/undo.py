@@ -1,4 +1,4 @@
-"""gx undo — Smart undo/redo via reflog walking."""
+"""gx undo -- Smart undo/redo via reflog walking."""
 
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ def _detect_state() -> dict | None:
             "type": "merge_conflict",
             "description": "merge conflict in progress",
             "command": "git merge --abort",
-            "action_msg": "Abort the merge \u2014 return to pre-merge state.",
+            "action_msg": "Abort the merge -- return to pre-merge state.",
         }
 
     # Priority 2: Rebase in progress
@@ -102,7 +102,7 @@ def _detect_state() -> dict | None:
             "type": "rebase",
             "description": "rebase in progress",
             "command": "git rebase --abort",
-            "action_msg": "Abort the rebase \u2014 return to pre-rebase state.",
+            "action_msg": "Abort the rebase -- return to pre-rebase state.",
         }
 
     # Priority 3: Staged files
@@ -113,7 +113,7 @@ def _detect_state() -> dict | None:
             "type": "stage",
             "description": f"{count} staged file{'s' if count != 1 else ''}",
             "command": "git reset HEAD",
-            "action_msg": "Unstage all files \u2014 changes stay in your working tree.",
+            "action_msg": "Unstage all files -- changes stay in your working tree.",
         }
 
     # Priority 4+: Walk reflog for recent actions
@@ -127,7 +127,7 @@ def _detect_state() -> dict | None:
                 "type": "amend",
                 "description": "amended commit",
                 "command": "git reset --soft HEAD@{1}",
-                "action_msg": "Restore pre-amend state \u2014 your changes will be preserved.",
+                "action_msg": "Restore pre-amend state -- your changes will be preserved.",
             }
 
         # Commit
@@ -158,7 +158,7 @@ def _detect_state() -> dict | None:
                 "type": "commit",
                 "description": f'commit "{msg}" ({short}, {age})',
                 "command": "git reset --soft HEAD~1",
-                "action_msg": "Soft reset to previous commit \u2014 your changes will be preserved in staging.",
+                "action_msg": "Soft reset to previous commit -- your changes will be preserved in staging.",
             }
 
         break  # Only inspect the most recent meaningful action
@@ -170,7 +170,7 @@ def undo(
     dry_run: bool = typer.Option(False, "--dry-run", help="See what would be undone without doing it."),
     history: bool = typer.Option(False, "--history", help="Show undo/redo history."),
 ) -> None:
-    """Smart undo \u2014 detects the last git action and reverses it."""
+    """Smart undo -- detects the last git action and reverses it."""
     try:
         ensure_git_repo()
     except GitError as e:
@@ -281,7 +281,7 @@ def redo() -> None:
         current_head = ""
 
     if current_head and last_undo.get("post_state_ref") and current_head != last_undo["post_state_ref"]:
-        print_error("Cannot redo \u2014 repo state has changed since last undo.")
+        print_error("Cannot redo -- repo state has changed since last undo.")
         console.print(f"  Expected HEAD at {last_undo['post_state_ref'][:7]}, but found {current_head[:7]}.")
         console.print("  You may have run other git commands since the undo.")
         print_info("Use `gx undo --history` to review past actions.")
@@ -297,7 +297,7 @@ def redo() -> None:
     # Redo by resetting to pre-state
     pre_ref = last_undo.get("pre_state_ref", "")
     if not pre_ref:
-        print_error("Cannot redo \u2014 no pre-state reference found.")
+        print_error("Cannot redo -- no pre-state reference found.")
         raise typer.Exit(1)
 
     action_type = last_undo.get("action_detected", "")

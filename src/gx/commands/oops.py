@@ -1,4 +1,4 @@
-"""gx oops — Quick-fix the last commit."""
+"""gx oops -- Quick-fix the last commit."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def oops(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change."),
     force: bool = typer.Option(False, "--force", help="Allow amending even if already pushed."),
 ) -> None:
-    """Quick-fix the last commit \u2014 amend message, add forgotten files, or both."""
+    """Quick-fix the last commit -- amend message, add forgotten files, or both."""
     try:
         ensure_git_repo()
     except GitError as e:
@@ -108,7 +108,7 @@ def oops(
                 staged = run_git(["diff", "--cached", "--name-only", filepath], check=False)
                 status = run_git(["status", "--porcelain", filepath], check=False)
                 if not diff and not staged and not status:
-                    print_info(f"No changes in {filepath} — skipping.")
+                    print_info(f"No changes in {filepath} -- skipping.")
                     continue
                 files_to_add.append(filepath)
                 actions.append(f"  + {filepath}")

@@ -1,4 +1,4 @@
-"""gx stack — Create a new branch on top of a parent branch."""
+"""gx stack -- Create a new branch on top of a parent branch."""
 
 from __future__ import annotations
 

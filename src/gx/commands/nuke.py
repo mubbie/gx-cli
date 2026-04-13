@@ -1,4 +1,4 @@
-"""gx nuke — Delete branches with confidence."""
+"""gx nuke -- Delete branches with confidence."""
 
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def nuke(
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation."),
     orphans: bool = typer.Option(False, "--orphans", help="Delete all orphaned branches from the stack."),
 ) -> None:
-    """Delete branches with confidence \u2014 local, remote, and tracking refs."""
+    """Delete branches with confidence -- local, remote, and tracking refs."""
     try:
         ensure_git_repo()
     except GitError as e:
@@ -135,10 +135,10 @@ def nuke(
     # Safety checks
     for branch in branches:
         if branch == current:
-            print_error(f"Cannot nuke '{branch}' \u2014 it's the current branch. Switch to another branch first.")
+            print_error(f"Cannot nuke '{branch}' -- it's the current branch. Switch to another branch first.")
             raise typer.Exit(1)
         if branch == head_branch:
-            print_error(f"Cannot nuke '{head_branch}' \u2014 it's the HEAD branch. This is blocked for safety.")
+            print_error(f"Cannot nuke '{head_branch}' -- it's the HEAD branch. This is blocked for safety.")
             raise typer.Exit(1)
 
     # Gather info
@@ -257,7 +257,7 @@ def _nuke_orphans(dry_run: bool, yes: bool) -> None:
     console.print()
 
     if dry_run:
-        console.print(f"[yellow]DRY RUN[/yellow] — would delete {len(stack.orphans)} orphaned branches.")
+        console.print(f"[yellow]DRY RUN[/yellow] -- would delete {len(stack.orphans)} orphaned branches.")
         return
 
     if not yes:

@@ -1,4 +1,4 @@
-"""gx who — Show who knows a file, directory, or repo best."""
+"""gx who -- Show who knows a file, directory, or repo best."""
 
 from __future__ import annotations
 

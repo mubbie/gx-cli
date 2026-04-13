@@ -1,4 +1,4 @@
-"""gx recap — Show what you (or someone else) did recently."""
+"""gx recap -- Show what you (or someone else) did recently."""
 
 from __future__ import annotations
 

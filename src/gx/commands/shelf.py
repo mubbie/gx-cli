@@ -1,4 +1,4 @@
-"""gx shelf — Visual stash manager."""
+"""gx shelf -- Visual stash manager."""
 
 from __future__ import annotations
 

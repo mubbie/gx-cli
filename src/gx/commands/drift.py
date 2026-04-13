@@ -1,4 +1,4 @@
-"""gx drift — Show how far your branch has diverged from the HEAD branch."""
+"""gx drift -- Show how far your branch has diverged from the HEAD branch."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def drift(
     console.print()
 
     if ahead_n == 0 and behind_n == 0:
-        print_success(f"No divergence \u2014 your branch is based on the latest {target_branch}.")
+        print_success(f"No divergence -- your branch is based on the latest {target_branch}.")
         return
 
     console.print(f"[bold]{current}[/bold] is {ahead_n} ahead, {behind_n} behind [bold]{target_branch}[/bold]")
@@ -115,7 +115,7 @@ def drift(
             age = time_ago(c["date"])
             console.print(f"  [dim]{c['hash']}[/dim]  {age:<12} {c['message']}")
         if not full and ahead_n > DRIFT_MAX_COMMITS:
-            console.print(f"  (and {ahead_n - DRIFT_MAX_COMMITS} more \u2014 use --full to see all)")
+            console.print(f"  (and {ahead_n - DRIFT_MAX_COMMITS} more -- use --full to see all)")
         console.print()
 
     # Commits on target
@@ -127,7 +127,7 @@ def drift(
             author = f" ({c['author']})" if c["author"] else ""
             console.print(f"  [dim]{c['hash']}[/dim]  {age:<12} {c['message']}{author}")
         if not full and behind_n > DRIFT_MAX_COMMITS:
-            console.print(f"  (and {behind_n - DRIFT_MAX_COMMITS} more \u2014 use --full to see all)")
+            console.print(f"  (and {behind_n - DRIFT_MAX_COMMITS} more -- use --full to see all)")
         console.print()
 
     # File divergence stats

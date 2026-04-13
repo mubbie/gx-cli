@@ -1,4 +1,4 @@
-"""Textual TUI for gx shelf — interactive stash browser."""
+"""Textual TUI for gx shelf -- interactive stash browser."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""gx conflicts — Preview merge conflicts before actually merging."""
+"""gx conflicts -- Preview merge conflicts before actually merging."""
 
 from __future__ import annotations
 
@@ -192,7 +192,7 @@ def conflicts(
     target: str = typer.Argument(None, help="Branch to check conflicts against (default: HEAD branch)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Always read-only (supported for consistency)."),
 ) -> None:
-    """Preview merge conflicts before merging \u2014 without touching the working tree."""
+    """Preview merge conflicts before merging -- without touching the working tree."""
     try:
         ensure_git_repo()
     except GitError as e:
@@ -229,7 +229,7 @@ def conflicts(
         raise typer.Exit(1)
 
     if not found_conflicts:
-        print_success("No conflicts \u2014 clean merge")
+        print_success("No conflicts -- clean merge")
 
         # Show what would be modified
         try:

@@ -1,4 +1,4 @@
-"""gx graph — Visualize the branch stack tree."""
+"""gx graph -- Visualize the branch stack tree."""
 
 from __future__ import annotations
 

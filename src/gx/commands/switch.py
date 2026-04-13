@@ -1,4 +1,4 @@
-"""gx switch — Branch switcher with search and rich context."""
+"""gx switch -- Branch switcher with search and rich context."""
 
 from __future__ import annotations
 

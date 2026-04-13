@@ -1,4 +1,4 @@
-"""gx sync — Rebase and push a chain of stacked branches."""
+"""gx sync -- Rebase and push a chain of stacked branches."""
 
 from __future__ import annotations
 
@@ -215,7 +215,7 @@ def sync(
         actions = [
             f"Would sync stack: {' -> '.join(chain)}",
             "",
-            f"Git {major}.{minor} detected — will use {strategy} strategy",
+            f"Git {major}.{minor} detected -- will use {strategy} strategy",
         ]
         if use_update_refs:
             actions.append(f"Step 1: Checkout {chain[-1]} (tip of stack)")

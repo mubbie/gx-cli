@@ -1,4 +1,4 @@
-"""gx sweep — Clean up merged branches and stale refs."""
+"""gx sweep -- Clean up merged branches and stale refs."""
 
 from __future__ import annotations
 
@@ -162,7 +162,7 @@ def sweep(
     console.print()
 
     if dry_run:
-        console.print("[dry_run]DRY RUN \u2014 no changes will be made[/dry_run]")
+        console.print("[dry_run]DRY RUN -- no changes will be made[/dry_run]")
         console.print()
         console.print(f"Would delete: {total_branches} branches, {len(stale_refs)} stale refs")
         return
