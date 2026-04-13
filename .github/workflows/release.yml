@@ -43,7 +43,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build and publish always run -- skip-existing makes re-runs safe
+      # Build and publish always run. skip-existing makes re-runs safe
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

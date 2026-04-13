@@ -1,4 +1,4 @@
-"""gx update -- Self-update gx to the latest version."""
+"""gx update: Self-update gx to the latest version."""
 
 from __future__ import annotations
 

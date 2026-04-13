@@ -1,4 +1,4 @@
-"""gx parent -- Print the stack parent branch name."""
+"""gx parent: Print the stack parent branch name."""
 
 from __future__ import annotations
 

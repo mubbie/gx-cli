@@ -63,7 +63,7 @@ def print_info(message: str) -> None:
 
 def print_dry_run(actions: list[str]) -> None:
     console.print()
-    console.print("[dry_run]DRY RUN -- no changes will be made[/dry_run]")
+    console.print("[dry_run]DRY RUN. No changes will be made[/dry_run]")
     console.print()
     for action in actions:
         console.print(f"  {action}")

@@ -111,7 +111,7 @@ def test_handoff_not_git_repo(tmp_path):
 
 def test_handoff_copy_flag(repo_with_commits):
     os.chdir(repo_with_commits)
-    # Just verify the flag doesn't crash -- clipboard may not be available in CI
+    # Just verify the flag doesn't crash: clipboard may not be available in CI
     result = runner.invoke(app, ["handoff", "--copy"])
     assert result.exit_code == 0
     assert "Commits" in result.output

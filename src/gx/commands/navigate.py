@@ -1,4 +1,4 @@
-"""gx up / gx down / gx top / gx bottom -- Stack navigation."""
+"""gx up / gx down / gx top / gx bottom: Stack navigation."""
 
 from __future__ import annotations
 

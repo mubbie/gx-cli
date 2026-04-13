@@ -1,4 +1,4 @@
-"""gx retarget -- Rebase a branch onto a new base."""
+"""gx retarget: Rebase a branch onto a new base."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def retarget(
         print_error(f"Target branch '{new_target}' does not exist.")
         raise typer.Exit(1)
 
-    # Find old parent -- prefer stored parent_head (exact SHA) for --onto
+    # Find old parent: prefer stored parent_head (exact SHA) for --onto
     old_parent = get_parent(branch)
     old_parent_ref = get_parent_head(branch) or old_parent
     if old_parent_ref is None:

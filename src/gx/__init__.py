@@ -1,4 +1,4 @@
-"""gx -- Git Productivity Toolkit."""
+"""gx: Git Productivity Toolkit."""
 
 from importlib.metadata import version
 

@@ -1,4 +1,4 @@
-"""gx context -- Enhanced repo status at a glance."""
+"""gx context: Enhanced repo status at a glance."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from gx.utils.git import (
 
 
 def context() -> None:
-    """Repo status at a glance -- branch, commits, working tree, and more."""
+    """Repo status at a glance: branch, commits, working tree, and more."""
     try:
         ensure_git_repo()
     except GitError as e:

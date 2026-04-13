@@ -1,4 +1,4 @@
-"""gx handoff -- Branch summary generator for PRs, Slack, or standups."""
+"""gx handoff: Branch summary generator for PRs, Slack, or standups."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Textual TUI for gx shelf -- interactive stash browser."""
+"""Textual TUI for gx shelf: interactive stash browser."""
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ class StashBrowser(App):  # type: ignore[type-arg]
         preview.clear()
         preview.write(_format_diff(diff))
 
-    # -- Actions --
+    #: Actions --
 
     def action_cursor_up(self) -> None:
         self.query_one("#stash-list", ListView).action_cursor_up()

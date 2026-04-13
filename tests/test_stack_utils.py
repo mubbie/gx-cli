@@ -212,6 +212,6 @@ def test_cycle_detection(stacked_repo):
 
     from gx.utils.stack import get_stack_chain
 
-    # Should not hang -- cycle guard breaks the loop
+    # Should not hang: cycle guard breaks the loop
     chain = get_stack_chain("feature/a")
     assert len(chain) <= 3  # At most a, b, a would be caught

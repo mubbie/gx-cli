@@ -1,4 +1,4 @@
-"""gx -- Git Productivity Toolkit. Typer app entry point."""
+"""gx: Git Productivity Toolkit. Typer app entry point."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ app = typer.Typer(
 )
 
 # Everyday
-app.command(help="Smart undo -- detects the last git action and reverses it.")(undo.undo)
+app.command(help="Smart undo. Detects the last git action and reverses it.")(undo.undo)
 app.command(name="redo", help="Redo the last undo.")(undo.redo)
 app.command()(oops.oops)
 app.command()(switch.switch)
@@ -68,7 +68,7 @@ app.command()(update.update)
 
 
 _GROUPED_HELP = """\
-gx -- Git Productivity Toolkit
+gx: Git Productivity Toolkit
 
 Everyday:
   undo, redo, oops, switch, context, sweep, shelf
@@ -99,7 +99,7 @@ def main(
         False, "--version", "-V", help="Show version and exit.", callback=version_callback, is_eager=True
     ),
 ) -> None:
-    """gx -- Git Productivity Toolkit"""
+    """gx: Git Productivity Toolkit"""
     if ctx.invoked_subcommand is None:
         typer.echo(_GROUPED_HELP)
         raise typer.Exit()

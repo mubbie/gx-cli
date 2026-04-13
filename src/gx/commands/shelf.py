@@ -1,4 +1,4 @@
-"""gx shelf -- Visual stash manager."""
+"""gx shelf: Visual stash manager."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ shelf_app = typer.Typer(
 
 @shelf_app.callback(invoke_without_command=True)
 def shelf_default(ctx: typer.Context) -> None:
-    """Visual stash manager -- browse, apply, and drop stashes interactively."""
+    """Visual stash manager. Browse, apply, and drop stashes interactively."""
     if ctx.invoked_subcommand is not None:
         return
 
@@ -141,10 +141,10 @@ def push(
         if include_untracked:
             untracked = run_git(["ls-files", "--others", "--exclude-standard"], check=False)
             if not untracked:
-                print_info("Nothing to stash -- working tree is clean.")
+                print_info("Nothing to stash. Working tree is clean.")
                 raise typer.Exit(0)
         else:
-            print_info("Nothing to stash -- working tree is clean.")
+            print_info("Nothing to stash. Working tree is clean.")
             raise typer.Exit(0)
 
     # Auto-generate message if not provided
