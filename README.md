@@ -47,6 +47,7 @@ Requires Python 3.9+.
 | [`gx recap`](#gx-recap) | What did I (or my team) do recently |
 | [`gx drift`](#gx-drift) | How far you've diverged from the HEAD branch |
 | [`gx conflicts`](#gx-conflicts) | Preview merge conflicts before merging |
+| [`gx handoff`](#gx-handoff) | Branch summary for PRs, Slack, or standups |
 
 **Stacking:**
 
@@ -439,6 +440,68 @@ Checking feature/search against main...
 ```
 
 Uses `git merge-tree` to simulate the merge entirely in memory. Nothing is modified on disk.
+
+---
+
+## gx handoff
+
+Generate a clean, copy-pasteable summary of your current branch -- commits, files changed, stats -- for PR descriptions, Slack, or standups.
+
+```
+gx handoff                  # Summary vs auto-detected base (stack parent or main)
+gx handoff --against main   # Summary against a specific branch
+gx handoff --copy           # Also copy to clipboard
+gx handoff --markdown       # Markdown format for PR descriptions
+```
+
+Auto-detects the base: uses the stack parent if the branch is in `stack.json`, otherwise falls back to main.
+
+**Plain text:**
+
+```
+$ gx handoff
+
+feature/auth-v2 (on feature/auth-v1)
+
+Commits (3):
+  a1b2c3d  Add auth token validation
+  d4e5f6g  Add auth middleware
+  h7i8j9k  Scaffold auth module
+
+4 files changed, +142 -38
+
+Files:
+  src/auth/middleware.ts
+  src/auth/validation.ts
+  src/auth/types.ts
+  tests/auth/middleware.test.ts
+```
+
+**Markdown (`--markdown`):**
+
+```
+$ gx handoff --markdown
+
+## feature/auth-v2
+**Base:** feature/auth-v1 · **3 commits** · 4 files changed (+142 -38)
+
+### Commits
+- `a1b2c3d` Add auth token validation
+- `d4e5f6g` Add auth middleware
+- `h7i8j9k` Scaffold auth module
+
+### Files Changed
+- `src/auth/middleware.ts`
+- `src/auth/validation.ts`
+- `src/auth/types.ts`
+- `tests/auth/middleware.test.ts`
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--against` | auto-detected | Compare against a specific branch |
+| `--copy, -c` | false | Copy output to system clipboard |
+| `--markdown, --md` | false | Format as markdown |
 
 ---
 

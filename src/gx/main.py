@@ -10,6 +10,7 @@ from gx.commands import (
     context,
     drift,
     graph,
+    handoff,
     navigate,
     nuke,
     oops,
@@ -47,6 +48,7 @@ app.command()(who.who)
 app.command()(recap.recap)
 app.command()(drift.drift)
 app.command()(conflicts.conflicts)
+app.command()(handoff.handoff)
 
 # Stacking
 app.command(name="stack")(stack_cmd.stack)
@@ -70,7 +72,7 @@ Everyday:
   undo, redo, oops, switch, context, sweep, shelf
 
 Insight:
-  who, recap, drift, conflicts
+  who, recap, drift, conflicts, handoff
 
 Stacking:
   stack, sync, retarget, graph, up, down, top, bottom
