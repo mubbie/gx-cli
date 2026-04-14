@@ -99,13 +99,7 @@ jobs:
         run: echo "${{ needs.release.outputs.version }}" > src/gx/VERSION
 
       - name: Build binary
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            pyinstaller gx.spec --noupx
-          else
-            pyinstaller gx.spec
-          fi
+        run: pyinstaller gx.spec
 
       - name: Verify binary (Unix)
         if: runner.os != 'Windows'
