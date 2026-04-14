@@ -11,6 +11,7 @@ from gx.commands import (
     drift,
     graph,
     handoff,
+    init_cmd,
     navigate,
     nuke,
     oops,
@@ -24,6 +25,7 @@ from gx.commands import (
     sync,
     undo,
     update,
+    view,
     who,
 )
 
@@ -33,6 +35,9 @@ app = typer.Typer(
     invoke_without_command=True,
     rich_markup_mode="rich",
 )
+
+# Setup
+app.command(name="init")(init_cmd.init)
 
 # Everyday
 app.command(help="Smart undo. Detects the last git action and reverses it.")(undo.undo)
@@ -50,6 +55,7 @@ app.command()(recap.recap)
 app.command()(drift.drift)
 app.command()(conflicts.conflicts)
 app.command()(handoff.handoff)
+app.command()(view.view)
 
 # Stacking
 app.command(name="stack")(stack_cmd.stack)
@@ -70,11 +76,14 @@ app.command()(update.update)
 _GROUPED_HELP = """\
 gx: Git Productivity Toolkit
 
+Setup:
+  init
+
 Everyday:
   undo, redo, oops, switch, context, sweep, shelf
 
 Insight:
-  who, recap, drift, conflicts, handoff
+  who, recap, drift, conflicts, handoff, view
 
 Stacking:
   stack, sync, retarget, graph, up, down, top, bottom, parent

@@ -27,6 +27,12 @@ Requires Python 3.9+.
 
 ## Commands
 
+**Setup:**
+
+| Command | Description |
+|---------|-------------|
+| [`gx init`](#gx-init) | Initialize gx stacking for this repo |
+
 **Everyday:**
 
 | Command | Description |
@@ -48,6 +54,7 @@ Requires Python 3.9+.
 | [`gx drift`](#gx-drift) | How far you've diverged from the HEAD branch |
 | [`gx conflicts`](#gx-conflicts) | Preview merge conflicts before merging |
 | [`gx handoff`](#gx-handoff) | Branch summary for PRs, Slack, or standups |
+| [`gx view`](#gx-view) | Quick status of your current stack |
 
 **Stacking:**
 
@@ -69,6 +76,39 @@ Requires Python 3.9+.
 |---------|-------------|
 | [`gx nuke`](#gx-nuke) | Delete branches with confidence |
 | `gx update` | Update gx to the latest version |
+
+---
+
+## gx init
+
+One-time setup: creates `.git/gx/`, configures the trunk branch, writes initial `stack.json`.
+
+```
+gx init                    # Auto-detect trunk branch
+gx init --trunk develop    # Explicitly set trunk branch
+gx init --force            # Re-initialize (preserves relationships)
+```
+
+```
+$ gx init
+
+Detected trunk branch: main
+
+OK Initialized gx in this repo.
+  Trunk: main
+  Stack config: .git/gx/stack.json
+
+  Get started:
+    gx stack feature/my-thing main    Create your first stacked branch
+    gx graph                          View your stack
+```
+
+Stacking commands still work without explicit `gx init`. If no `stack.json` exists, it auto-initializes silently. `gx init` is recommended but never required.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--trunk` | auto-detected | Explicitly set the trunk branch |
+| `--force` | false | Re-initialize (preserves relationships, resets metadata) |
 
 ---
 
@@ -503,6 +543,29 @@ $ gx handoff --markdown
 | `--against` | auto-detected | Compare against a specific branch |
 | `--copy, -c` | false | Copy output to system clipboard |
 | `--markdown, --md` | false | Format as markdown |
+
+---
+
+## gx view
+
+Quick, focused view of the stack you're currently in. Lighter than `gx graph` (which shows all branches).
+
+```
+gx view
+```
+
+```
+$ gx view
+
+main
+  <- feature/auth-v1          2 ahead   3h ago
+  <- feature/auth-v2          3 ahead   1h ago    <
+  <- feature/auth-v3          1 ahead   20m ago
+```
+
+Shows PR status if `gh` CLI is installed (omitted silently otherwise). On trunk, lists all stacks. On an untracked branch, shows info vs trunk and suggests `gx stack`.
+
+No flags, no arguments. Just run it.
 
 ---
 
