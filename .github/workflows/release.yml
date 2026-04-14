@@ -70,9 +70,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
-            target: darwin_amd64
-          - os: macos-14
+          - os: macos-latest
             target: darwin_arm64
           - os: ubuntu-22.04
             target: linux_amd64
@@ -101,7 +99,13 @@ jobs:
         run: echo "${{ needs.release.outputs.version }}" > src/gx/VERSION
 
       - name: Build binary
-        run: pyinstaller gx.spec
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pyinstaller gx.spec --noupx
+          else
+            pyinstaller gx.spec
+          fi
 
       - name: Verify binary (Unix)
         if: runner.os != 'Windows'
@@ -155,7 +159,7 @@ jobs:
         run: |
           VERSION="${{ needs.release.outputs.version }}"
           TAG="${{ needs.release.outputs.tag }}"
-          for target in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+          for target in darwin_arm64 linux_amd64 linux_arm64; do
             gh release download "$TAG" \
               --repo mubbie/gx-cli \
               --pattern "gx_${VERSION}_${target}.tar.gz.sha256"
@@ -165,7 +169,6 @@ jobs:
         id: shas
         run: |
           VERSION="${{ needs.release.outputs.version }}"
-          echo "darwin_amd64=$(awk '{print $1}' gx_${VERSION}_darwin_amd64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
           echo "darwin_arm64=$(awk '{print $1}' gx_${VERSION}_darwin_arm64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
           echo "linux_amd64=$(awk '{print $1}' gx_${VERSION}_linux_amd64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
           echo "linux_arm64=$(awk '{print $1}' gx_${VERSION}_linux_arm64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
@@ -180,7 +183,6 @@ jobs:
             {
               "formula": "gx-git",
               "version": "${{ needs.release.outputs.version }}",
-              "darwin_amd64_sha256": "${{ steps.shas.outputs.darwin_amd64 }}",
               "darwin_arm64_sha256": "${{ steps.shas.outputs.darwin_arm64 }}",
               "linux_amd64_sha256": "${{ steps.shas.outputs.linux_amd64 }}",
               "linux_arm64_sha256": "${{ steps.shas.outputs.linux_arm64 }}"
