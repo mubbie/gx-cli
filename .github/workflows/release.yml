@@ -9,9 +9,15 @@ permissions:
   id-token: write
 
 jobs:
+  # Job 1: Create GitHub Release + Publish to PyPI
   release:
     runs-on: ubuntu-latest
     environment: pypi
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.check.outputs.created }}
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -29,13 +35,13 @@ jobs:
         id: check
         run: |
           if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "created=false" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "created=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create release
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.created == 'true'
         run: |
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
@@ -55,3 +61,127 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+  # Job 2: Build PyInstaller binaries
+  build-binaries:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            target: darwin_amd64
+          - os: macos-14
+            target: darwin_arm64
+          - os: ubuntu-22.04
+            target: linux_amd64
+          - os: ubuntu-22.04-arm
+            target: linux_arm64
+          - os: windows-latest
+            target: windows_amd64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Write VERSION file
+        shell: bash
+        run: echo "${{ needs.release.outputs.version }}" > src/gx/VERSION
+
+      - name: Build binary
+        run: pyinstaller gx.spec
+
+      - name: Verify binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x dist/gx
+          ./dist/gx --version
+
+      - name: Verify binary (Windows)
+        if: runner.os == 'Windows'
+        run: dist\gx.exe --version
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd dist
+          ARCHIVE="gx_${{ needs.release.outputs.version }}_${{ matrix.target }}.tar.gz"
+          tar czf "$ARCHIVE" gx
+          shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist
+          $version = "${{ needs.release.outputs.version }}"
+          $archive = "gx_${version}_${{ matrix.target }}.zip"
+          Compress-Archive -Path gx.exe -DestinationPath $archive
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          "$hash  $archive" | Out-File -Encoding utf8 "$archive.sha256"
+
+      - name: Upload to GitHub Release
+        shell: bash
+        run: |
+          gh release upload "${{ needs.release.outputs.tag }}" \
+            dist/gx_${{ needs.release.outputs.version }}_${{ matrix.target }}.* \
+            --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 3: Update Homebrew formula
+  update-homebrew:
+    needs: [release, build-binaries]
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download SHA256 files from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          TAG="${{ needs.release.outputs.tag }}"
+          for target in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+            gh release download "$TAG" \
+              --repo mubbie/gx-cli \
+              --pattern "gx_${VERSION}_${target}.tar.gz.sha256"
+          done
+
+      - name: Parse SHA256 values
+        id: shas
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          echo "darwin_amd64=$(awk '{print $1}' gx_${VERSION}_darwin_amd64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "darwin_arm64=$(awk '{print $1}' gx_${VERSION}_darwin_arm64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "linux_amd64=$(awk '{print $1}' gx_${VERSION}_linux_amd64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$(awk '{print $1}' gx_${VERSION}_linux_arm64.tar.gz.sha256)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch to homebrew-tap
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: mubbie/homebrew-tap
+          event-type: update-formula
+          client-payload: >-
+            {
+              "formula": "gx-git",
+              "version": "${{ needs.release.outputs.version }}",
+              "darwin_amd64_sha256": "${{ steps.shas.outputs.darwin_amd64 }}",
+              "darwin_arm64_sha256": "${{ steps.shas.outputs.darwin_arm64 }}",
+              "linux_amd64_sha256": "${{ steps.shas.outputs.linux_amd64 }}",
+              "linux_arm64_sha256": "${{ steps.shas.outputs.linux_arm64 }}"
+            }

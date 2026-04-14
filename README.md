@@ -11,19 +11,24 @@ Git Productivity Toolkit
 
 ## Install
 
-**Recommended** (isolated environment via [pipx](https://pipx.pypa.io/)):
+**Homebrew** (macOS / Linux):
+
+```
+brew tap mubbie/tap
+brew install gx-git
+```
+
+**pipx** (isolated environment, requires Python 3.9+):
 
 ```
 pipx install gx-git
 ```
 
-**Alternative** (via pip):
+**pip:**
 
 ```
 pip install gx-git
 ```
-
-Requires Python 3.9+.
 
 ## Commands
 

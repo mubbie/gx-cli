@@ -52,6 +52,7 @@ pythonpath = ["src"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pyinstaller>=6.0",
 ]
 
 [tool.ruff]
