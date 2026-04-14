@@ -112,3 +112,7 @@ def main(
     if ctx.invoked_subcommand is None:
         typer.echo(_GROUPED_HELP)
         raise typer.Exit()
+
+
+if __name__ == "__main__":
+    app()
