@@ -1,0 +1,55 @@
+version: 2
+
+project_name: gx
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: gx
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: "gx_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: mubbie
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: .
+    homepage: "https://github.com/mubbie/gx-cli"
+    description: "Git Productivity Toolkit: smart undo, stacking, branch management and more"
+    license: "MIT"
+    install: |
+      bin.install "gx"
+    test: |
+      assert_match "gx", shell_output("#{bin}/gx --version")
