@@ -135,7 +135,6 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 	}
 
 	query := ""
-	reader := newLineReader()
 
 	for {
 		var filtered []stashEntry
@@ -164,7 +163,7 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 		fmt.Println(ui.DimStyle.Render("  <n>a = apply  <n>p = pop (apply+drop)  <n>d = drop"))
 		fmt.Println(ui.DimStyle.Render("  text = filter  q = cancel"))
 
-		choice := reader.read()
+		choice := ui.ReadLine()
 		if choice == "" || strings.ToLower(choice) == "q" {
 			return nil
 		}

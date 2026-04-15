@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
@@ -114,7 +112,7 @@ func runHandoff(cmd *cobra.Command, args []string) error {
 	fmt.Println(output)
 
 	if copyFlag {
-		if copyToClipboard(output) {
+		if ui.CopyToClipboard(output) {
 			fmt.Println()
 			ui.PrintSuccess("Copied to clipboard.")
 		} else {
@@ -175,18 +173,3 @@ func formatHandoffMD(branch, base string, commits []handoffCommit, stat string, 
 	return b.String()
 }
 
-func copyToClipboard(text string) bool {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("pbcopy")
-	case "linux":
-		cmd = exec.Command("xclip", "-selection", "clipboard")
-	case "windows":
-		cmd = exec.Command("clip")
-	default:
-		return false
-	}
-	cmd.Stdin = strings.NewReader(text)
-	return cmd.Run() == nil
-}

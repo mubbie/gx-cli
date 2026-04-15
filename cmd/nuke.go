@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
@@ -47,7 +46,7 @@ func runNuke(cmd *cobra.Command, args []string) error {
 	yes, _ := cmd.Flags().GetBool("yes")
 
 	// Resolve branches
-	branches := resolveBranches(pattern)
+	branches := git.ResolveBranches(pattern)
 	if len(branches) == 0 {
 		ui.PrintError(fmt.Sprintf("No branches matching '%s' found.", pattern))
 		return nil
@@ -67,7 +66,7 @@ func runNuke(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	mergedSet := mergedBranches(head)
+	mergedSet := git.MergedBranches(head)
 
 	if dryRun {
 		var actions []string
@@ -167,59 +166,3 @@ func nukeOrphans(cmd *cobra.Command) error {
 	return nil
 }
 
-func resolveBranches(pattern string) []string {
-	out := git.RunUnchecked("branch", "--format=%(refname:short)")
-	seen := make(map[string]bool)
-	var all []string
-	for _, b := range strings.Split(out, "\n") {
-		b = strings.TrimSpace(b)
-		if b != "" {
-			all = append(all, b)
-			seen[b] = true
-		}
-	}
-
-	// Also check remote-only branches
-	remoteOut := git.RunUnchecked("branch", "-r", "--format=%(refname:short)")
-	for _, b := range strings.Split(remoteOut, "\n") {
-		b = strings.TrimSpace(b)
-		if b == "" {
-			continue
-		}
-		// Strip "origin/" prefix
-		name := strings.TrimPrefix(b, "origin/")
-		if name == "HEAD" || seen[name] {
-			continue
-		}
-		all = append(all, name)
-		seen[name] = true
-	}
-
-	// Exact match
-	for _, b := range all {
-		if b == pattern {
-			return []string{b}
-		}
-	}
-
-	// Glob match
-	var matches []string
-	for _, b := range all {
-		if matched, _ := filepath.Match(pattern, b); matched {
-			matches = append(matches, b)
-		}
-	}
-	return matches
-}
-
-func mergedBranches(into string) map[string]bool {
-	out := git.RunUnchecked("branch", "--merged", into)
-	set := make(map[string]bool)
-	for _, line := range strings.Split(out, "\n") {
-		name := strings.TrimSpace(strings.TrimLeft(line, "* "))
-		if name != "" {
-			set[name] = true
-		}
-	}
-	return set
-}

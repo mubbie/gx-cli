@@ -20,23 +20,6 @@ func visibleWidth(s string) int {
 	return lipgloss.Width(s)
 }
 
-// truncateVisible shortens a string to max visible characters.
-// It strips ANSI codes, truncates the plain text, then the caller
-// must re-apply styles. This is a plain-text truncation only.
-func truncateVisible(s string, max int) string {
-	if max <= 3 {
-		max = 4
-	}
-	w := visibleWidth(s)
-	if w <= max {
-		return s
-	}
-	// Walk through runes, counting visible width
-	// For styled strings, we need to strip and re-style.
-	// Simplest: just use the raw string if it has no ANSI codes,
-	// otherwise let lipgloss handle the width via padding.
-	return s
-}
 
 func PrintTable(headers []string, rows [][]string, title string) {
 	if title != "" {

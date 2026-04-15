@@ -112,7 +112,6 @@ func getBranches() []branchInfo {
 
 func pickBranch(branches []branchInfo) string {
 	query := ""
-	reader := newLineReader()
 
 	for {
 		var filtered []branchInfo
@@ -164,7 +163,7 @@ func pickBranch(branches []branchInfo) string {
 			fmt.Println(ui.DimStyle.Render("Enter text to filter, q to cancel"))
 		}
 
-		choice := reader.read()
+		choice := ui.ReadLine()
 		if choice == "" || strings.ToLower(choice) == "q" {
 			return ""
 		}
@@ -182,13 +181,3 @@ func pickBranch(branches []branchInfo) string {
 	}
 }
 
-type lineReader struct{}
-
-func newLineReader() lineReader { return lineReader{} }
-
-func (lineReader) read() string {
-	fmt.Print("> ")
-	var line string
-	fmt.Scanln(&line)
-	return strings.TrimSpace(line)
-}
