@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
 	"github.com/mubbie/gx-cli/internal/ui"
@@ -74,16 +75,29 @@ func runOops(cmd *cobra.Command, args []string) error {
 
 	if len(addFiles) > 0 {
 		fmt.Println("  Adding to last commit:")
+		var validFiles []string
 		for _, f := range addFiles {
 			if f != "." {
 				if _, err := os.Stat(f); os.IsNotExist(err) {
 					ui.PrintError(fmt.Sprintf("File not found: %s", f))
 					return nil
 				}
+				// Check if file actually has changes
+				status := git.RunUnchecked("status", "--porcelain", f)
+				if strings.TrimSpace(status) == "" {
+					ui.PrintWarning(fmt.Sprintf("Skipping %s: no changes detected", f))
+					continue
+				}
 			}
+			validFiles = append(validFiles, f)
 			fmt.Printf("    + %s\n", f)
 			dryActions = append(dryActions, fmt.Sprintf("Would add %s to last commit", f))
 		}
+		if len(validFiles) == 0 && message == "" {
+			ui.PrintInfo("No files with changes to add.")
+			return nil
+		}
+		addFiles = validFiles
 		fmt.Println()
 	}
 

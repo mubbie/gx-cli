@@ -107,6 +107,11 @@ func HeadBranch() string {
 			return name
 		}
 	}
+
+	// Last resort: use whatever branch HEAD is on
+	if branch, err := CurrentBranch(); err == nil && branch != "" {
+		return branch
+	}
 	return "main"
 }
 

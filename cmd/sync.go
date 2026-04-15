@@ -74,6 +74,13 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// --update-refs only works on linear chains; validate that each branch
+	// in the chain is the parent of the next one.
+	if useUpdateRefs && !isLinearChain(chain) {
+		ui.PrintInfo("Stack has siblings. Falling back to --onto iteration.")
+		useUpdateRefs = false
+	}
+
 	var success bool
 	if useUpdateRefs {
 		success = syncUpdateRefs(chain, root)
@@ -135,18 +142,23 @@ func syncUpdateRefs(chain []string, root string) bool {
 func syncOnto(chain []string) bool {
 	fmt.Println("  Rebasing stack (using --onto fallback)...")
 
+	// Capture all pre-rebase SHAs so --onto has correct old bases
+	preRebaseSHA := make(map[string]string, len(chain))
+	for _, b := range chain {
+		sha, _ := git.Run("rev-parse", b)
+		preRebaseSHA[b] = sha
+	}
+
 	for i := 1; i < len(chain); i++ {
 		parent := chain[i-1]
 		branch := chain[i]
-
-		oldSHA, _ := git.Run("rev-parse", parent)
 
 		var c *exec.Cmd
 		if i == 1 {
 			c = exec.Command("git", "rebase", parent, branch)
 		} else {
 			newParentSHA, _ := git.Run("rev-parse", parent)
-			c = exec.Command("git", "rebase", "--onto", newParentSHA, oldSHA, branch)
+			c = exec.Command("git", "rebase", "--onto", newParentSHA, preRebaseSHA[parent], branch)
 		}
 
 		out, err := c.CombinedOutput()
@@ -193,4 +205,16 @@ func autoDetectChain() []string {
 	chainUp := stack.StackChain(current)
 	descendants := stack.Descendants(current)
 	return append(chainUp, descendants...)
+}
+
+// isLinearChain returns true if each branch in chain[1:] has exactly one child
+// (the next branch in the chain), meaning there are no siblings.
+func isLinearChain(chain []string) bool {
+	for i := 0; i < len(chain)-1; i++ {
+		children := stack.Children(chain[i])
+		if len(children) != 1 || children[0] != chain[i+1] {
+			return false
+		}
+	}
+	return true
 }

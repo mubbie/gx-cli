@@ -51,8 +51,16 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Checking %s against %s...\n\n", ui.BoldStyle.Render(current), ui.BoldStyle.Render(target))
 
-	// Try new-style merge-tree
+	// Try new-style merge-tree (Git >= 2.38), fall back to old 3-arg form
 	out, err := git.Run("merge-tree", "--write-tree", "HEAD", target)
+	if err != nil {
+		// --write-tree not supported; try old 3-arg form: git merge-tree <merge-base> HEAD <target>
+		mb, mbErr := git.MergeBase("HEAD", target)
+		if mbErr == nil && mb != "" {
+			out, err = git.Run("merge-tree", mb, "HEAD", target)
+		}
+	}
+
 	var conflicts []string
 	cleanFiles := 0
 

@@ -74,6 +74,22 @@ func Load() (*Config, error) {
 	if cfg.Branches == nil {
 		cfg.Branches = make(map[string]*BranchMeta)
 	}
+
+	// Migrate legacy {"relationships": {"child": "parent"}} format
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		if _, hasRel := raw["relationships"]; hasRel {
+			if _, hasBranches := raw["branches"]; !hasBranches {
+				var relationships map[string]string
+				if err := json.Unmarshal(raw["relationships"], &relationships); err == nil {
+					cfg.Branches = make(map[string]*BranchMeta, len(relationships))
+					for child, parent := range relationships {
+						cfg.Branches[child] = &BranchMeta{Parent: parent, ParentHead: ""}
+					}
+				}
+			}
+		}
+	}
 	if cfg.Meta.MainBranch == "" {
 		cfg.Meta.MainBranch = git.HeadBranch()
 	}
