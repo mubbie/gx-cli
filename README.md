@@ -789,9 +789,14 @@ git rebase $(gx parent)             # manual rebase
 
 ## Tech Stack
 
-- [Go](https://go.dev/)
+**Go (Homebrew / binary):**
 - [Cobra](https://github.com/spf13/cobra): CLI framework
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss): Terminal styling
+
+**Python (pip / pipx):**
+- [Typer](https://typer.tiangolo.com/): CLI framework
+- [Rich](https://rich.readthedocs.io/): Terminal formatting
+- [Textual](https://textual.textualize.io/): TUI for interactive stash browser
 
 ## License
 

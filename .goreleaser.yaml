@@ -41,7 +41,8 @@ changelog:
       - "^ci:"
 
 brews:
-  - repository:
+  - name: gx-git
+    repository:
       owner: mubbie
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
