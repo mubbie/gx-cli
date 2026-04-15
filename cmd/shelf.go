@@ -32,13 +32,6 @@ func init() {
 		RunE:  runShelfList,
 	}
 
-	showCmd := &cobra.Command{
-		Use:   "show <number>",
-		Short: "Show diff for a stash",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runShelfShow,
-	}
-
 	clearCmd := &cobra.Command{
 		Use:   "clear",
 		Short: "Drop all stashes",
@@ -46,7 +39,7 @@ func init() {
 	}
 	clearCmd.Flags().Bool("dry-run", false, "Show what would be dropped")
 
-	shelfCmd.AddCommand(pushCmd, listCmd, showCmd, clearCmd)
+	shelfCmd.AddCommand(pushCmd, listCmd, clearCmd)
 	rootCmd.AddCommand(shelfCmd)
 }
 
@@ -57,6 +50,7 @@ type stashEntry struct {
 	time   string
 	msg    string
 	branch string
+	files  string // e.g. "3 files changed"
 }
 
 func getStashList() []stashEntry {
@@ -88,6 +82,21 @@ func getStashList() []stashEntry {
 				branch = msg[7:colon]
 			}
 		}
+
+		// Get file stats
+		stat := git.RunUnchecked("stash", "show", "--stat", parts[0])
+		files := ""
+		if stat != "" {
+			lines := strings.Split(stat, "\n")
+			for _, l := range lines {
+				l = strings.TrimSpace(l)
+				if strings.Contains(l, "file") && strings.Contains(l, "changed") {
+					files = l
+					break
+				}
+			}
+		}
+
 		entries = append(entries, stashEntry{
 			index:  idx,
 			id:     parts[0],
@@ -95,6 +104,7 @@ func getStashList() []stashEntry {
 			time:   parts[2],
 			msg:    msg,
 			branch: branch,
+			files:  files,
 		})
 	}
 	return entries
@@ -133,42 +143,46 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 		if len(filtered) == 0 {
 			fmt.Println(ui.DimStyle.Render("  No stashes match your search."))
 		} else {
-			maxMsgLen := 50
 			for _, s := range filtered {
 				msg := s.msg
-				if len(msg) > maxMsgLen {
-					msg = msg[:maxMsgLen-3] + "..."
+				if len(msg) > 55 {
+					msg = msg[:52] + "..."
 				}
-				branchStr := ""
-				if s.branch != "" {
-					branchStr = ui.BranchStyle.Render(s.branch)
+				filesInfo := ""
+				if s.files != "" {
+					filesInfo = ui.DimStyle.Render("  " + s.files)
 				}
-				fmt.Printf("  %s  %s  %s\n",
-					ui.DimStyle.Render(fmt.Sprintf("%3d", s.index)),
-					ui.DateStyle.Render(fmt.Sprintf("%-15s", s.time)),
-					msg)
-				if branchStr != "" {
-					fmt.Printf("       %s\n", branchStr)
-				}
+				fmt.Printf("  %s  %s  %s%s\n",
+					ui.HashStyle.Render(fmt.Sprintf("%2d", s.index)),
+					ui.DateStyle.Render(fmt.Sprintf("%-14s", s.time)),
+					msg,
+					filesInfo)
 			}
 		}
 
 		fmt.Println()
-		if len(filtered) > 0 {
-			fmt.Println(ui.DimStyle.Render("Enter number to select, text to filter, q to cancel"))
-			fmt.Println(ui.DimStyle.Render("Then: p=pop  a=apply  d=drop  s=show diff"))
-		} else {
-			fmt.Println(ui.DimStyle.Render("Enter text to filter, q to cancel"))
-		}
+		fmt.Println(ui.DimStyle.Render("  <n>a = apply  <n>p = pop (apply+drop)  <n>d = drop"))
+		fmt.Println(ui.DimStyle.Render("  text = filter  q = cancel"))
 
 		choice := reader.read()
 		if choice == "" || strings.ToLower(choice) == "q" {
 			return nil
 		}
 
-		// Try as number
-		if n, err := strconv.Atoi(choice); err == nil {
-			// Find the stash with this index
+		// Parse: number + optional action letter (e.g. "0p", "2a", "1d", or just "0")
+		choice = strings.TrimSpace(choice)
+		action := ""
+		numStr := choice
+
+		if len(choice) > 0 {
+			last := choice[len(choice)-1]
+			if last == 'p' || last == 'a' || last == 'd' {
+				action = string(last)
+				numStr = strings.TrimSpace(choice[:len(choice)-1])
+			}
+		}
+
+		if n, err := strconv.Atoi(numStr); err == nil {
 			var selected *stashEntry
 			for i := range filtered {
 				if filtered[i].index == n {
@@ -181,16 +195,17 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			fmt.Printf("\n  Selected: %s %s\n", ui.HashStyle.Render(selected.id), selected.msg)
-			fmt.Println(ui.DimStyle.Render("  p=pop  a=apply  d=drop  s=show diff  q=cancel"))
-			action := reader.read()
+			// If no action letter, default to apply
+			if action == "" {
+				action = "a"
+			}
 
-			switch strings.ToLower(action) {
+			switch action {
 			case "p":
 				if _, err := git.Run("stash", "pop", selected.id); err != nil {
 					ui.PrintError(fmt.Sprintf("Pop failed: %s", err))
 				} else {
-					ui.PrintSuccess(fmt.Sprintf("Popped %s", selected.id))
+					ui.PrintSuccess(fmt.Sprintf("Popped %s (applied and dropped)", selected.id))
 				}
 				return nil
 			case "a":
@@ -211,76 +226,11 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 					ui.PrintSuccess(fmt.Sprintf("Dropped %s", selected.id))
 				}
 				return nil
-			case "s":
-				showStashDiff(selected.id)
-				continue
-			default:
-				continue
 			}
 		}
 
-		// Otherwise treat as search filter
 		query = strings.ToLower(choice)
 	}
-}
-
-func showStashDiff(id string) {
-	diff, err := git.Run("stash", "show", "-p", id)
-	if err != nil {
-		ui.PrintError(fmt.Sprintf("Failed to load diff: %s", err))
-		return
-	}
-
-	fmt.Println()
-	// Show stat summary first
-	stat := git.RunUnchecked("stash", "show", "--stat", id)
-	if stat != "" {
-		for _, line := range strings.Split(stat, "\n") {
-			if strings.Contains(line, "|") {
-				parts := strings.SplitN(line, "|", 2)
-				fmt.Printf("  %s|%s\n", ui.FileStyle.Render(parts[0]), parts[1])
-			} else if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s\n", line)
-			}
-		}
-	}
-
-	fmt.Println()
-	// Show colored diff
-	for _, line := range strings.Split(diff, "\n") {
-		switch {
-		case strings.HasPrefix(line, "diff "):
-			fmt.Println(ui.BranchStyle.Render(line))
-		case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-			fmt.Println(ui.BoldStyle.Render(line))
-		case strings.HasPrefix(line, "@@"):
-			fmt.Println(ui.InfoStyle.Render(line))
-		case strings.HasPrefix(line, "+"):
-			fmt.Println(ui.AddStyle.Render(line))
-		case strings.HasPrefix(line, "-"):
-			fmt.Println(ui.DelStyle.Render(line))
-		default:
-			fmt.Println(line)
-		}
-	}
-	fmt.Println()
-}
-
-func runShelfShow(cmd *cobra.Command, args []string) error {
-	if err := git.EnsureRepo(); err != nil {
-		ui.PrintError(err.Error())
-		return nil
-	}
-
-	n, err := strconv.Atoi(args[0])
-	if err != nil {
-		ui.PrintError(fmt.Sprintf("Invalid stash number: %s", args[0]))
-		return nil
-	}
-
-	id := fmt.Sprintf("stash@{%d}", n)
-	showStashDiff(id)
-	return nil
 }
 
 func runShelfPush(cmd *cobra.Command, args []string) error {
@@ -344,21 +294,22 @@ func runShelfList(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\n%d stash%s:\n\n", len(stashes), ui.PluralES(len(stashes)))
 
-	var rows [][]string
 	for _, s := range stashes {
-		b := s.branch
-		if b == "" {
-			b = ui.DimStyle.Render("--")
-		} else {
-			b = ui.BranchStyle.Render(b)
-		}
 		msg := s.msg
-		if len(msg) > 60 {
-			msg = msg[:57] + "..."
+		if len(msg) > 55 {
+			msg = msg[:52] + "..."
 		}
-		rows = append(rows, []string{ui.HashStyle.Render(fmt.Sprintf("%d", s.index)), ui.DateStyle.Render(s.time), b, msg})
+		filesInfo := ""
+		if s.files != "" {
+			filesInfo = ui.DimStyle.Render("  " + s.files)
+		}
+		fmt.Printf("  %s  %s  %s%s\n",
+			ui.HashStyle.Render(fmt.Sprintf("%2d", s.index)),
+			ui.DateStyle.Render(fmt.Sprintf("%-14s", s.time)),
+			msg,
+			filesInfo)
 	}
-	ui.PrintTable([]string{"#", "Age", "Branch", "Message"}, rows, "")
+	fmt.Println()
 	return nil
 }
 
