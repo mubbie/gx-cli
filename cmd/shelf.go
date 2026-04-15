@@ -2,20 +2,19 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mubbie/gx-cli/internal/git"
-	shelftui "github.com/mubbie/gx-cli/internal/tui/shelf"
 	"github.com/mubbie/gx-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var shelfCmd = &cobra.Command{
 	Use:   "shelf",
-	Short: "Visual stash manager",
-	RunE:  runShelfTUI, // Default: launch interactive TUI
+	Short: "Stash manager",
+	RunE:  runShelfInteractive,
 }
 
 func init() {
@@ -33,6 +32,13 @@ func init() {
 		RunE:  runShelfList,
 	}
 
+	showCmd := &cobra.Command{
+		Use:   "show <number>",
+		Short: "Show diff for a stash",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runShelfShow,
+	}
+
 	clearCmd := &cobra.Command{
 		Use:   "clear",
 		Short: "Drop all stashes",
@@ -40,16 +46,16 @@ func init() {
 	}
 	clearCmd.Flags().Bool("dry-run", false, "Show what would be dropped")
 
-	shelfCmd.AddCommand(pushCmd, listCmd, clearCmd)
+	shelfCmd.AddCommand(pushCmd, listCmd, showCmd, clearCmd)
 	rootCmd.AddCommand(shelfCmd)
 }
 
 type stashEntry struct {
-	index int
-	id    string
-	hash  string
-	time  string
-	msg   string
+	index  int
+	id     string
+	hash   string
+	time   string
+	msg    string
 	branch string
 }
 
@@ -94,7 +100,7 @@ func getStashList() []stashEntry {
 	return entries
 }
 
-func runShelfTUI(cmd *cobra.Command, args []string) error {
+func runShelfInteractive(cmd *cobra.Command, args []string) error {
 	if err := git.EnsureRepo(); err != nil {
 		ui.PrintError(err.Error())
 		return nil
@@ -106,48 +112,174 @@ func runShelfTUI(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Convert to TUI entries
-	entries := make([]shelftui.StashEntry, len(stashes))
-	for i, s := range stashes {
-		entries[i] = shelftui.StashEntry{
-			Index:   s.index,
-			ID:      s.id,
-			Time:    s.time,
-			Message: s.msg,
-			Branch:  s.branch,
+	query := ""
+	reader := newLineReader()
+
+	for {
+		var filtered []stashEntry
+		if query == "" {
+			filtered = stashes
+		} else {
+			for _, s := range stashes {
+				if strings.Contains(strings.ToLower(s.msg), query) ||
+					strings.Contains(strings.ToLower(s.branch), query) {
+					filtered = append(filtered, s)
+				}
+			}
+		}
+
+		fmt.Printf("\n%d stash%s:\n\n", len(filtered), ui.PluralES(len(filtered)))
+
+		if len(filtered) == 0 {
+			fmt.Println(ui.DimStyle.Render("  No stashes match your search."))
+		} else {
+			maxMsgLen := 50
+			for _, s := range filtered {
+				msg := s.msg
+				if len(msg) > maxMsgLen {
+					msg = msg[:maxMsgLen-3] + "..."
+				}
+				branchStr := ""
+				if s.branch != "" {
+					branchStr = ui.BranchStyle.Render(s.branch)
+				}
+				fmt.Printf("  %s  %s  %s\n",
+					ui.DimStyle.Render(fmt.Sprintf("%3d", s.index)),
+					ui.DateStyle.Render(fmt.Sprintf("%-15s", s.time)),
+					msg)
+				if branchStr != "" {
+					fmt.Printf("       %s\n", branchStr)
+				}
+			}
+		}
+
+		fmt.Println()
+		if len(filtered) > 0 {
+			fmt.Println(ui.DimStyle.Render("Enter number to select, text to filter, q to cancel"))
+			fmt.Println(ui.DimStyle.Render("Then: p=pop  a=apply  d=drop  s=show diff"))
+		} else {
+			fmt.Println(ui.DimStyle.Render("Enter text to filter, q to cancel"))
+		}
+
+		choice := reader.read()
+		if choice == "" || strings.ToLower(choice) == "q" {
+			return nil
+		}
+
+		// Try as number
+		if n, err := strconv.Atoi(choice); err == nil {
+			// Find the stash with this index
+			var selected *stashEntry
+			for i := range filtered {
+				if filtered[i].index == n {
+					selected = &filtered[i]
+					break
+				}
+			}
+			if selected == nil {
+				ui.PrintError(fmt.Sprintf("No stash with index %d.", n))
+				continue
+			}
+
+			fmt.Printf("\n  Selected: %s %s\n", ui.HashStyle.Render(selected.id), selected.msg)
+			fmt.Println(ui.DimStyle.Render("  p=pop  a=apply  d=drop  s=show diff  q=cancel"))
+			action := reader.read()
+
+			switch strings.ToLower(action) {
+			case "p":
+				if _, err := git.Run("stash", "pop", selected.id); err != nil {
+					ui.PrintError(fmt.Sprintf("Pop failed: %s", err))
+				} else {
+					ui.PrintSuccess(fmt.Sprintf("Popped %s", selected.id))
+				}
+				return nil
+			case "a":
+				if _, err := git.Run("stash", "apply", selected.id); err != nil {
+					ui.PrintError(fmt.Sprintf("Apply failed: %s", err))
+				} else {
+					ui.PrintSuccess(fmt.Sprintf("Applied %s (stash kept)", selected.id))
+				}
+				return nil
+			case "d":
+				if !ui.Confirm(fmt.Sprintf("Drop %s?", selected.id)) {
+					ui.PrintInfo("Cancelled.")
+					continue
+				}
+				if _, err := git.Run("stash", "drop", selected.id); err != nil {
+					ui.PrintError(fmt.Sprintf("Drop failed: %s", err))
+				} else {
+					ui.PrintSuccess(fmt.Sprintf("Dropped %s", selected.id))
+				}
+				return nil
+			case "s":
+				showStashDiff(selected.id)
+				continue
+			default:
+				continue
+			}
+		}
+
+		// Otherwise treat as search filter
+		query = strings.ToLower(choice)
+	}
+}
+
+func showStashDiff(id string) {
+	diff, err := git.Run("stash", "show", "-p", id)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to load diff: %s", err))
+		return
+	}
+
+	fmt.Println()
+	// Show stat summary first
+	stat := git.RunUnchecked("stash", "show", "--stat", id)
+	if stat != "" {
+		for _, line := range strings.Split(stat, "\n") {
+			if strings.Contains(line, "|") {
+				parts := strings.SplitN(line, "|", 2)
+				fmt.Printf("  %s|%s\n", ui.FileStyle.Render(parts[0]), parts[1])
+			} else if strings.TrimSpace(line) != "" {
+				fmt.Printf("  %s\n", line)
+			}
 		}
 	}
 
-	model := shelftui.New(entries)
-	p := tea.NewProgram(model, tea.WithAltScreen())
-	finalModel, err := p.Run()
-	if err != nil {
-		ui.PrintError(fmt.Sprintf("TUI error: %s", err))
+	fmt.Println()
+	// Show colored diff
+	for _, line := range strings.Split(diff, "\n") {
+		switch {
+		case strings.HasPrefix(line, "diff "):
+			fmt.Println(ui.BranchStyle.Render(line))
+		case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
+			fmt.Println(ui.BoldStyle.Render(line))
+		case strings.HasPrefix(line, "@@"):
+			fmt.Println(ui.InfoStyle.Render(line))
+		case strings.HasPrefix(line, "+"):
+			fmt.Println(ui.AddStyle.Render(line))
+		case strings.HasPrefix(line, "-"):
+			fmt.Println(ui.DelStyle.Render(line))
+		default:
+			fmt.Println(line)
+		}
+	}
+	fmt.Println()
+}
+
+func runShelfShow(cmd *cobra.Command, args []string) error {
+	if err := git.EnsureRepo(); err != nil {
+		ui.PrintError(err.Error())
 		return nil
 	}
 
-	result := finalModel.(shelftui.Model).Result()
-	switch result.Type {
-	case "pop":
-		if _, err := git.Run("stash", "pop", result.ID); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to pop %s: %s", result.ID, err))
-		} else {
-			ui.PrintSuccess(fmt.Sprintf("Popped %s", result.ID))
-		}
-	case "apply":
-		if _, err := git.Run("stash", "apply", result.ID); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to apply %s: %s", result.ID, err))
-		} else {
-			ui.PrintSuccess(fmt.Sprintf("Applied %s", result.ID))
-		}
-	case "drop":
-		if _, err := git.Run("stash", "drop", result.ID); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to drop %s: %s", result.ID, err))
-		} else {
-			ui.PrintSuccess(fmt.Sprintf("Dropped %s", result.ID))
-		}
+	n, err := strconv.Atoi(args[0])
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Invalid stash number: %s", args[0]))
+		return nil
 	}
 
+	id := fmt.Sprintf("stash@{%d}", n)
+	showStashDiff(id)
 	return nil
 }
 
@@ -268,4 +400,3 @@ func runShelfClear(cmd *cobra.Command, args []string) error {
 	ui.PrintSuccess("All stashes cleared.")
 	return nil
 }
-
