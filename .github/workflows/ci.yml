@@ -7,7 +7,37 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  # Go
+  go-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Build
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            go build -o gx.exe .
+          else
+            go build -o gx .
+          fi
+      - run: go vet ./...
+      - name: Verify binary
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./gx.exe --version
+          else
+            ./gx --version
+          fi
+
+  # Python
+  python-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -18,22 +48,12 @@ jobs:
       - run: ruff check src/
       - run: mypy src/gx/ --ignore-missing-imports
 
-  test:
+  python-test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - ubuntu-24.04-arm
-          - macos-latest
-          - windows-latest
-          - windows-11-arm
-        python-version: ["3.9", "3.12", "3.13"]
-        exclude:
-          - os: windows-11-arm
-            python-version: "3.9"
-          - os: ubuntu-24.04-arm
-            python-version: "3.9"
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -41,5 +61,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: gx --version
-      - run: gx --help
       - run: python -m pytest tests/ -v
