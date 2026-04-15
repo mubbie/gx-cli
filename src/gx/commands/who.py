@@ -65,7 +65,7 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
         return
 
     # Parse shortlog output: "  123\tName <email>"
-    raw_entries = []
+    raw_entries: list[dict[str, str | int]] = []
     for line in output.splitlines():
         line = line.strip()
         if not line:
@@ -85,21 +85,18 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
 
     # Deduplicate by email: merge entries with the same email,
     # keep the name with the most commits as the display name
-    by_email: dict[str, dict] = {}
+    by_email: dict[str, dict[str, str | int]] = {}
     for entry in raw_entries:
-        email = entry["email"]
-        if not email:
-            # No email: use name as key
-            key = f"__name__{entry['name'].lower()}"
-        else:
-            key = email
+        e_email = str(entry["email"])
+        e_name = str(entry["name"])
+        e_commits = int(entry["commits"])
+        key = e_email if e_email else f"__name__{e_name.lower()}"
         if key in by_email:
-            by_email[key]["commits"] += entry["commits"]
-            # Keep the longer name (usually the real one, not a username)
-            if len(entry["name"]) > len(by_email[key]["name"]):
-                by_email[key]["name"] = entry["name"]
+            by_email[key]["commits"] = int(by_email[key]["commits"]) + e_commits
+            if len(e_name) > len(str(by_email[key]["name"])):
+                by_email[key]["name"] = e_name
         else:
-            by_email[key] = dict(entry)
+            by_email[key] = {"name": e_name, "email": e_email, "commits": e_commits}
 
     contributors = sorted(by_email.values(), key=lambda c: c["commits"], reverse=True)
 
