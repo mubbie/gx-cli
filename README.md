@@ -1,8 +1,7 @@
 # gx
 
 [![CI](https://github.com/mubbie/gx-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/mubbie/gx-cli/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/gx-git)](https://pypi.org/project/gx-git/)
-[![Python](https://img.shields.io/pypi/pyversions/gx-git)](https://pypi.org/project/gx-git/)
+[![GitHub Release](https://img.shields.io/github/v/release/mubbie/gx-cli)](https://github.com/mubbie/gx-cli/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Git Productivity Toolkit
@@ -18,17 +17,15 @@ brew tap mubbie/tap
 brew install gx-git
 ```
 
-**pipx** (isolated environment, requires Python 3.9+):
+**Go:**
 
 ```
-pipx install gx-git
+go install github.com/mubbie/gx-cli@latest
 ```
 
-**pip:**
+**Binary download:**
 
-```
-pip install gx-git
-```
+Grab the latest binary from [GitHub Releases](https://github.com/mubbie/gx-cli/releases) and add it to your PATH.
 
 ## Commands
 
@@ -786,9 +783,9 @@ git rebase $(gx parent)             # manual rebase
 
 ## Tech Stack
 
-- [Typer](https://typer.tiangolo.com/): CLI framework
-- [Rich](https://rich.readthedocs.io/): Terminal formatting (colors, tables, spinners)
-- [Textual](https://textual.textualize.io/): TUI for interactive stash browser
+- [Go](https://go.dev/)
+- [Cobra](https://github.com/spf13/cobra): CLI framework
+- [Lip Gloss](https://github.com/charmbracelet/lipgloss): Terminal styling
 
 ## License
 
