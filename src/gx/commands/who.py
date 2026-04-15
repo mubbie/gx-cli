@@ -83,22 +83,62 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
             email = ""
         raw_entries.append({"name": name, "email": email, "commits": commits})
 
-    # Deduplicate by email: merge entries with the same email,
-    # keep the name with the most commits as the display name
-    by_email: dict[str, dict[str, str | int]] = {}
-    for entry in raw_entries:
-        e_email = str(entry["email"])
-        e_name = str(entry["name"])
-        e_commits = int(entry["commits"])
-        key = e_email if e_email else f"__name__{e_name.lower()}"
-        if key in by_email:
-            by_email[key]["commits"] = int(by_email[key]["commits"]) + e_commits
-            if len(e_name) > len(str(by_email[key]["name"])):
-                by_email[key]["name"] = e_name
-        else:
-            by_email[key] = {"name": e_name, "email": e_email, "commits": e_commits}
+    # Deduplicate: group entries that likely belong to the same person.
+    # Strategy: build a union-find by email, email username, and lowercase name.
+    # Any two entries sharing a key get merged.
+    group_of: dict[int, int] = {}  # entry index -> group index
 
-    contributors = sorted(by_email.values(), key=lambda c: c["commits"], reverse=True)
+    def find(i: int) -> int:
+        while group_of.get(i, i) != i:
+            group_of[i] = group_of.get(group_of[i], group_of[i])
+            i = group_of[i]
+        return i
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            group_of[rb] = ra
+
+    # Map keys to entry indices for merging
+    key_to_idx: dict[str, int] = {}
+    for idx, entry in enumerate(raw_entries):
+        e_email = str(entry["email"]).lower()
+        e_name = str(entry["name"]).lower()
+        group_of[idx] = idx
+
+        keys: list[str] = []
+        if e_email:
+            keys.append(f"email:{e_email}")
+            username = e_email.split("@")[0]
+            if username:
+                keys.append(f"user:{username}")
+        if e_name:
+            keys.append(f"name:{e_name}")
+
+        for key in keys:
+            if key in key_to_idx:
+                union(idx, key_to_idx[key])
+            else:
+                key_to_idx[key] = idx
+
+    # Merge grouped entries
+    groups: dict[int, dict[str, str | int]] = {}
+    for idx, entry in enumerate(raw_entries):
+        root = find(idx)
+        e_name = str(entry["name"])
+        e_email = str(entry["email"])
+        e_commits = int(entry["commits"])
+        if root in groups:
+            groups[root]["commits"] = int(groups[root]["commits"]) + e_commits
+            # Keep the longest name (most likely the real full name)
+            if len(e_name) > len(str(groups[root]["name"])):
+                groups[root]["name"] = e_name
+            if e_email and not groups[root]["email"]:
+                groups[root]["email"] = e_email
+        else:
+            groups[root] = {"name": e_name, "email": e_email, "commits": e_commits}
+
+    contributors = sorted(groups.values(), key=lambda c: c["commits"], reverse=True)
 
     # Get current git user (both name and email for matching)
     try:
