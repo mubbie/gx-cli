@@ -175,6 +175,9 @@ def _repo_level(n: int, since: str | None, show_email: bool = False) -> None:
         rows=rows,
         title="Top contributors",
     )
+    if current_user_name or current_user_email:
+        console.print()
+        console.print(f"[dim]You: {current_user_name} <{current_user_email}>[/dim]")
 
 
 def _file_level(filepath: str, n: int, since: str | None, show_email: bool) -> None:
