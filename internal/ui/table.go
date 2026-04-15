@@ -3,52 +3,59 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
-// PrintTable prints a simple formatted table.
+var (
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("4")).Padding(0, 1)
+	cellStyle   = lipgloss.NewStyle().Padding(0, 1)
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).MarginBottom(1)
+)
+
 func PrintTable(headers []string, rows [][]string, title string) {
 	if title != "" {
-		fmt.Println(BoldStyle.Render(title))
-		fmt.Println()
+		fmt.Println(titleStyle.Render(title))
 	}
 
 	// Calculate column widths
 	widths := make([]int, len(headers))
 	for i, h := range headers {
-		widths[i] = len(h)
+		widths[i] = len(h) + 2 // padding
 	}
 	for _, row := range rows {
 		for i, cell := range row {
-			if i < len(widths) && len(cell) > widths[i] {
-				widths[i] = len(cell)
+			if i < len(widths) && len(cell)+2 > widths[i] {
+				widths[i] = len(cell) + 2
 			}
 		}
 	}
 
-	// Print header
-	headerParts := make([]string, len(headers))
+	// Build header row
+	headerCells := make([]string, len(headers))
 	for i, h := range headers {
-		headerParts[i] = fmt.Sprintf("%-*s", widths[i], h)
+		headerCells[i] = headerStyle.Width(widths[i]).Render(h)
 	}
-	fmt.Println("  " + strings.Join(headerParts, "  "))
+	fmt.Println(strings.Join(headerCells, ""))
 
-	// Print separator
+	// Separator
 	sepParts := make([]string, len(headers))
 	for i := range headers {
-		sepParts[i] = strings.Repeat("-", widths[i])
+		sepParts[i] = DimStyle.Render(strings.Repeat("─", widths[i]))
 	}
-	fmt.Println("  " + strings.Join(sepParts, "  "))
+	fmt.Println(strings.Join(sepParts, ""))
 
-	// Print rows
+	// Rows
 	for _, row := range rows {
-		parts := make([]string, len(headers))
+		cells := make([]string, len(headers))
 		for i := range headers {
 			cell := ""
 			if i < len(row) {
 				cell = row[i]
 			}
-			parts[i] = fmt.Sprintf("%-*s", widths[i], cell)
+			cells[i] = cellStyle.Width(widths[i]).Render(cell)
 		}
-		fmt.Println("  " + strings.Join(parts, "  "))
+		fmt.Println(strings.Join(cells, ""))
 	}
+	fmt.Println()
 }

@@ -97,26 +97,30 @@ func runSweep(cmd *cobra.Command, args []string) error {
 	if len(merged) > 0 {
 		fmt.Println(ui.BoldStyle.Render("Merged branches (safe to delete):"))
 		for _, b := range merged {
-			fmt.Printf("  %s\n", b)
+			fmt.Printf("  %s\n", ui.BranchStyle.Render(b))
 		}
 		fmt.Println()
 	}
 	if len(squashMerged) > 0 {
 		fmt.Println(ui.BoldStyle.Render("Likely squash-merged branches:"))
 		for _, b := range squashMerged {
-			fmt.Printf("  %s\n", b)
+			fmt.Printf("  %s\n", ui.BranchStyle.Render(b))
 		}
 		fmt.Println()
 	}
 	if len(staleRefs) > 0 {
 		fmt.Println(ui.BoldStyle.Render("Stale remote tracking refs:"))
 		for _, r := range staleRefs {
-			fmt.Printf("  %s\n", r)
+			fmt.Printf("  %s\n", ui.DimStyle.Render(r))
 		}
 		fmt.Println()
 	}
 
-	fmt.Printf("Summary: %d merged, %d likely squash-merged, %d stale refs\n\n", len(merged), len(squashMerged), len(staleRefs))
+	fmt.Printf("%s %s merged, %s likely squash-merged, %s stale refs\n\n",
+		ui.BoldStyle.Render("Summary:"),
+		ui.BoldStyle.Render(fmt.Sprintf("%d", len(merged))),
+		ui.BoldStyle.Render(fmt.Sprintf("%d", len(squashMerged))),
+		ui.BoldStyle.Render(fmt.Sprintf("%d", len(staleRefs))))
 
 	if dryRun {
 		fmt.Printf("%s would delete %d branches, %d stale refs\n", ui.WarningStyle.Render("DRY RUN"), len(merged)+len(squashMerged), len(staleRefs))

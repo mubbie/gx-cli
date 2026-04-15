@@ -54,42 +54,42 @@ func runGraph(cmd *cobra.Command, args []string) error {
 }
 
 func renderNode(node *stack.BranchNode, prefix string, isLast bool) {
-	connector := "|-- "
+	connector := ui.DimStyle.Render("|-- ")
 	if isLast {
-		connector = "`-- "
+		connector = ui.DimStyle.Render("`-- ")
 	}
 
 	// Status indicators
 	indicators := ""
 	if node.IsHead {
-		indicators += "  " + ui.SuccessStyle.Bold(true).Render("* HEAD")
+		indicators += "  " + ui.HeadMarker.Render("* HEAD")
 	}
 	if node.IsMerged {
 		indicators += "  " + ui.DimStyle.Render("+ merged")
 	} else if node.IsOrphan {
 		indicators += "  " + ui.WarningStyle.Render("! orphaned")
 	} else if node.Ahead > 0 || node.Behind > 0 {
-		indicators += fmt.Sprintf("  (+%d/-%d)", node.Ahead, node.Behind)
+		indicators += "  " + ui.BranchStyle.Render(fmt.Sprintf("(+%d/-%d)", node.Ahead, node.Behind))
 	}
 
 	// Branch name color
 	var name string
 	switch {
 	case node.IsHead:
-		name = ui.SuccessStyle.Bold(true).Render(node.Name)
+		name = ui.HeadMarker.Render(node.Name)
 	case node.IsMerged:
 		name = ui.DimStyle.Render(node.Name)
 	case node.IsOrphan:
 		name = ui.WarningStyle.Render(node.Name)
 	default:
-		name = ui.InfoStyle.Render(node.Name)
+		name = ui.BranchStyle.Render(node.Name)
 	}
 
 	fmt.Printf("%s%s%s%s\n", prefix, connector, name, indicators)
 
-	childPrefix := prefix + "    "
-	if !isLast {
-		childPrefix = prefix + "|   "
+	childPrefix := prefix + ui.DimStyle.Render("|") + "   "
+	if isLast {
+		childPrefix = prefix + "    "
 	}
 	for i, child := range node.Children {
 		renderNode(child, childPrefix, i == len(node.Children)-1)

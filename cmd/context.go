@@ -32,29 +32,29 @@ func runContext(cmd *cobra.Command, args []string) error {
 	branch, err := git.CurrentBranch()
 	if err != nil {
 		shortHash := git.RunUnchecked("rev-parse", "--short", "HEAD")
-		fmt.Printf("Branch:       (detached HEAD at %s)\n", shortHash)
+		fmt.Printf("%s  (detached HEAD at %s)\n", ui.LabelStyle.Render("Branch:"), ui.HashStyle.Render(shortHash))
 		ui.PrintWarning("You are in detached HEAD state.")
 	} else {
-		fmt.Printf("Branch:       %s\n", branch)
+		fmt.Printf("%s  %s\n", ui.LabelStyle.Render("Branch:"), ui.BranchStyle.Render(branch))
 
 		// Tracking
 		tracking := git.RunUnchecked("rev-parse", "--abbrev-ref", branch+"@{upstream}")
 		if tracking != "" {
 			ahead, behind := git.AheadBehind(branch, tracking)
 			if ahead == 0 && behind == 0 {
-				fmt.Printf("Tracking:     %s (up to date)\n", tracking)
+				fmt.Printf("%s  %s %s\n", ui.LabelStyle.Render("Tracking:"), tracking, ui.DimStyle.Render("(up to date)"))
 			} else {
 				parts := ""
 				if ahead > 0 {
-					parts += fmt.Sprintf("%d ahead", ahead)
+					parts += ui.AddStyle.Render(fmt.Sprintf("%d ahead", ahead))
 				}
 				if behind > 0 {
 					if parts != "" {
 						parts += ", "
 					}
-					parts += fmt.Sprintf("%d behind", behind)
+					parts += ui.DelStyle.Render(fmt.Sprintf("%d behind", behind))
 				}
-				fmt.Printf("Tracking:     %s (%s)\n", tracking, parts)
+				fmt.Printf("%s  %s (%s)\n", ui.LabelStyle.Render("Tracking:"), tracking, parts)
 			}
 		}
 
@@ -62,7 +62,9 @@ func runContext(cmd *cobra.Command, args []string) error {
 		headBranch := git.HeadBranch()
 		if branch != headBranch {
 			ahead, behind := git.AheadBehind(branch, headBranch)
-			fmt.Printf("vs %s:      %d ahead, %d behind\n", headBranch, ahead, behind)
+			aheadStr := ui.AddStyle.Render(fmt.Sprintf("%d ahead", ahead))
+			behindStr := ui.DelStyle.Render(fmt.Sprintf("%d behind", behind))
+			fmt.Printf("%s  %s, %s\n", ui.LabelStyle.Render(fmt.Sprintf("vs %s:", headBranch)), aheadStr, behindStr)
 		}
 	}
 
@@ -71,9 +73,9 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Last commit
 	_, shortHash, message, _, date := git.LastCommit()
 	if shortHash != "" {
-		fmt.Printf("Last commit:  %s \"%s\" (%s)\n", shortHash, message, git.TimeAgo(date))
+		fmt.Printf("%s  %s \"%s\" %s\n", ui.LabelStyle.Render("Last commit:"), ui.HashStyle.Render(shortHash), message, ui.DateStyle.Render("("+git.TimeAgo(date)+")"))
 	} else {
-		fmt.Println("Last commit:  No commits yet")
+		fmt.Printf("%s  %s\n", ui.LabelStyle.Render("Last commit:"), ui.DimStyle.Render("No commits yet"))
 	}
 
 	fmt.Println()
@@ -81,7 +83,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Working tree
 	status := git.RunUnchecked("status", "--porcelain")
 	if status == "" {
-		fmt.Println("Working tree: clean")
+		fmt.Printf("%s %s\n", ui.LabelStyle.Render("Working tree:"), ui.SuccessStyle.Render("clean"))
 	} else {
 		modified, staged, untracked := 0, 0, 0
 		for _, line := range strings.Split(status, "\n") {
@@ -99,15 +101,15 @@ func runContext(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-		fmt.Println("Working tree:")
+		fmt.Println(ui.LabelStyle.Render("Working tree:"))
 		if modified > 0 {
-			fmt.Printf("  Modified:   %d file%s\n", modified, ui.Plural(modified))
+			fmt.Printf("  %s  %s\n", ui.LabelStyle.Render("Modified:"), ui.WarningStyle.Render(fmt.Sprintf("%d file%s", modified, ui.Plural(modified))))
 		}
 		if staged > 0 {
-			fmt.Printf("  Staged:     %d file%s\n", staged, ui.Plural(staged))
+			fmt.Printf("  %s  %s\n", ui.LabelStyle.Render("Staged:"), ui.AddStyle.Render(fmt.Sprintf("%d file%s", staged, ui.Plural(staged))))
 		}
 		if untracked > 0 {
-			fmt.Printf("  Untracked:  %d file%s\n", untracked, ui.Plural(untracked))
+			fmt.Printf("  %s  %s\n", ui.LabelStyle.Render("Untracked:"), ui.DimStyle.Render(fmt.Sprintf("%d file%s", untracked, ui.Plural(untracked))))
 		}
 	}
 
@@ -116,9 +118,9 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Stash
 	stashCount := git.StashCount()
 	if stashCount > 0 {
-		fmt.Printf("Stash:        %d entr%s\n", stashCount, ui.PluralIES(stashCount))
+		fmt.Printf("%s  %d entr%s\n", ui.LabelStyle.Render("Stash:"), stashCount, ui.PluralIES(stashCount))
 	} else {
-		fmt.Println("Stash:        empty")
+		fmt.Printf("%s  %s\n", ui.LabelStyle.Render("Stash:"), ui.DimStyle.Render("empty"))
 	}
 
 	// Active operations

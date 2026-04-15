@@ -74,9 +74,9 @@ func runNuke(cmd *cobra.Command, args []string) error {
 		for _, b := range branches {
 			local := git.BranchExists(b)
 			remote := git.RemoteBranchExists(b)
-			actions = append(actions, fmt.Sprintf("  %s  Local: %v  Remote: %v  Merged: %v", b, local, remote, mergedSet[b]))
+			actions = append(actions, fmt.Sprintf("  %s  Local: %v  Remote: %v  Merged: %v", ui.BranchStyle.Render(b), local, remote, mergedSet[b]))
 		}
-		actions = append(actions, "", fmt.Sprintf("Would delete: %d branches", len(branches)))
+		actions = append(actions, "", fmt.Sprintf("Would delete: %s", ui.WarningStyle.Render(fmt.Sprintf("%d branches", len(branches)))))
 		ui.PrintDryRun(actions)
 		return nil
 	}
@@ -86,7 +86,7 @@ func runNuke(cmd *cobra.Command, args []string) error {
 	for _, b := range branches {
 		if !mergedSet[b] {
 			hasUnmerged = true
-			fmt.Printf("\n  %s is NOT merged into %s.\n", b, head)
+			fmt.Printf("\n  %s is %s into %s.\n", ui.BranchStyle.Render(b), ui.ErrorStyle.Bold(true).Render("NOT merged"), ui.BranchStyle.Render(head))
 		}
 		children := stack.Children(b)
 		if len(children) > 0 {
@@ -140,7 +140,7 @@ func nukeOrphans(cmd *cobra.Command) error {
 	fmt.Println()
 	fmt.Println(ui.BoldStyle.Render("Orphaned branches:"))
 	for _, o := range tree.Orphans {
-		fmt.Println("  " + o.Name)
+		fmt.Println("  " + ui.BranchStyle.Render(o.Name))
 	}
 	fmt.Println()
 

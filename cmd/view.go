@@ -86,7 +86,7 @@ func runView(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.BoldStyle.Render(trunk))
+	fmt.Println(ui.BranchStyle.Render(trunk))
 	for _, branch := range allBranches {
 		meta := cfg.Branches[branch]
 		parent := trunk
@@ -96,21 +96,21 @@ func runView(cmd *cobra.Command, args []string) error {
 		ahead, _ := git.AheadBehind(branch, parent)
 		age := git.TimeAgo(git.RunUnchecked("log", "-1", "--format=%aI", branch))
 
-		parts := []string{fmt.Sprintf("  <- %-30s", branch)}
+		parts := []string{fmt.Sprintf("  <- %-30s", ui.BranchStyle.Render(branch))}
 
 		if hasGH {
 			if pr, ok := prMap[branch]; ok {
 				parts = append(parts, fmt.Sprintf("%-22s", formatPRStatus(pr)))
 			} else {
-				parts = append(parts, fmt.Sprintf("%-22s", "  no PR"))
+				parts = append(parts, fmt.Sprintf("%-22s", ui.DimStyle.Render("  no PR")))
 			}
 		}
 
-		parts = append(parts, fmt.Sprintf("%d ahead   ", ahead))
-		parts = append(parts, age)
+		parts = append(parts, ui.AddStyle.Render(fmt.Sprintf("%d ahead", ahead))+"   ")
+		parts = append(parts, ui.DateStyle.Render(age))
 
 		if branch == current {
-			parts = append(parts, "  "+ui.SuccessStyle.Bold(true).Render("<"))
+			parts = append(parts, "  "+ui.HeadMarker.Render("<"))
 		}
 		fmt.Println(strings.Join(parts, ""))
 	}
@@ -120,7 +120,7 @@ func runView(cmd *cobra.Command, args []string) error {
 
 func showTrunkView(cfg *stack.Config, trunk string) {
 	fmt.Println()
-	fmt.Printf("You're on %s (trunk).\n\n", ui.BoldStyle.Render(trunk))
+	fmt.Printf("You're on %s %s\n\n", ui.BranchStyle.Render(trunk), ui.DimStyle.Render("(trunk)"))
 
 	// Find direct children
 	var children []string
@@ -136,7 +136,7 @@ func showTrunkView(cfg *stack.Config, trunk string) {
 		return
 	}
 
-	fmt.Printf("Stacks branching from %s:\n", trunk)
+	fmt.Printf("Stacks branching from %s:\n", ui.BranchStyle.Render(trunk))
 	for _, child := range children {
 		// Walk down the chain
 		chain := []string{child}
@@ -154,10 +154,14 @@ func showTrunkView(cfg *stack.Config, trunk string) {
 			chain = append(chain, kids[0])
 			cur = kids[0]
 		}
+		coloredChain := make([]string, len(chain))
+		for i, c := range chain {
+			coloredChain[i] = ui.BranchStyle.Render(c)
+		}
 		if len(chain) == 1 {
-			fmt.Printf("  <- %s\n", child)
+			fmt.Printf("  <- %s\n", coloredChain[0])
 		} else {
-			fmt.Printf("  <- %s   (%d branches)\n", strings.Join(chain, " -> "), len(chain))
+			fmt.Printf("  <- %s   %s\n", strings.Join(coloredChain, " -> "), ui.DimStyle.Render(fmt.Sprintf("(%d branches)", len(chain))))
 		}
 	}
 	fmt.Println()
@@ -196,13 +200,13 @@ func fetchPRMap() map[string]prInfo {
 func formatPRStatus(pr prInfo) string {
 	switch {
 	case pr.State == "MERGED":
-		return fmt.Sprintf("#%d  + merged", pr.Number)
+		return fmt.Sprintf("#%d  %s", pr.Number, ui.DimStyle.Render("+ merged"))
 	case pr.ReviewDecision == "APPROVED":
-		return fmt.Sprintf("#%d  + approved", pr.Number)
+		return fmt.Sprintf("#%d  %s", pr.Number, ui.SuccessStyle.Render("+ approved"))
 	case pr.ReviewDecision == "CHANGES_REQUESTED":
-		return fmt.Sprintf("#%d  x changes", pr.Number)
+		return fmt.Sprintf("#%d  %s", pr.Number, ui.ErrorStyle.Render("x changes"))
 	case pr.State == "OPEN":
-		return fmt.Sprintf("#%d  o reviewing", pr.Number)
+		return fmt.Sprintf("#%d  %s", pr.Number, ui.WarningStyle.Render("o reviewing"))
 	default:
 		return fmt.Sprintf("#%d  %s", pr.Number, strings.ToLower(pr.State))
 	}

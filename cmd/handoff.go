@@ -128,20 +128,36 @@ func runHandoff(cmd *cobra.Command, args []string) error {
 func formatHandoffPlain(branch, base string, isStacked bool, commits []handoffCommit, stat string, files []string) string {
 	var b strings.Builder
 	if isStacked {
-		fmt.Fprintf(&b, "%s (on %s)\n", branch, base)
+		fmt.Fprintf(&b, "%s (on %s)\n", ui.BranchStyle.Render(branch), ui.DimStyle.Render(base))
 	} else {
-		fmt.Fprintf(&b, "%s (vs %s)\n", branch, base)
+		fmt.Fprintf(&b, "%s (vs %s)\n", ui.BranchStyle.Render(branch), ui.DimStyle.Render(base))
 	}
-	fmt.Fprintf(&b, "\nCommits (%d):\n", len(commits))
+	fmt.Fprintf(&b, "\n%s\n", ui.BoldStyle.Render(fmt.Sprintf("Commits (%d):", len(commits))))
 	for _, c := range commits {
-		fmt.Fprintf(&b, "  %s  %s\n", c.hash, c.msg)
+		fmt.Fprintf(&b, "  %s  %s\n", ui.HashStyle.Render(c.hash), c.msg)
 	}
-	fmt.Fprintf(&b, "\n%s\n", stat)
-	fmt.Fprintf(&b, "\nFiles:\n")
+	// Color the stat summary line
+	colored := colorStatLine(stat)
+	fmt.Fprintf(&b, "\n%s\n", colored)
+	fmt.Fprintf(&b, "\n%s\n", ui.BoldStyle.Render("Files:"))
 	for _, f := range files {
-		fmt.Fprintf(&b, "  %s\n", f)
+		fmt.Fprintf(&b, "  %s\n", ui.FileStyle.Render(f))
 	}
 	return b.String()
+}
+
+func colorStatLine(stat string) string {
+	// Color insertions green and deletions red in stat summary
+	parts := strings.Split(stat, ",")
+	for i, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if strings.Contains(trimmed, "insertion") {
+			parts[i] = " " + ui.AddStyle.Render(trimmed)
+		} else if strings.Contains(trimmed, "deletion") {
+			parts[i] = " " + ui.DelStyle.Render(trimmed)
+		}
+	}
+	return strings.Join(parts, ",")
 }
 
 func formatHandoffMD(branch, base string, commits []handoffCommit, stat string, files []string) string {

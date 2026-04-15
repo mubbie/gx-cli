@@ -115,8 +115,8 @@ func runUndo(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("%s %s\n", ui.BoldStyle.Render("Detected:"), state.Desc)
 	fmt.Println()
-	fmt.Printf("  Action:  %s\n", state.ActionMsg)
-	fmt.Printf("  Command: %s\n", state.Command)
+	fmt.Printf("  %s  %s\n", ui.LabelStyle.Render("Action:"), state.ActionMsg)
+	fmt.Printf("  %s  %s\n", ui.LabelStyle.Render("Command:"), ui.DimStyle.Render(state.Command))
 
 	if dryRun {
 		ui.PrintDryRun([]string{

@@ -157,9 +157,11 @@ func runShelfList(cmd *cobra.Command, args []string) error {
 	for _, s := range stashes {
 		b := s.branch
 		if b == "" {
-			b = "--"
+			b = ui.DimStyle.Render("--")
+		} else {
+			b = ui.BranchStyle.Render(b)
 		}
-		rows = append(rows, []string{fmt.Sprintf("%d", s.index), s.time, b, s.msg})
+		rows = append(rows, []string{ui.HashStyle.Render(fmt.Sprintf("%d", s.index)), ui.DateStyle.Render(s.time), b, s.msg})
 	}
 	ui.PrintTable([]string{"#", "Age", "Branch", "Message"}, rows, "")
 	return nil
@@ -181,7 +183,7 @@ func runShelfClear(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\nThis will permanently delete ALL %d stashes:\n\n", len(stashes))
 	for _, s := range stashes {
-		fmt.Printf("  %s  %-15s %s\n", s.id, s.time, s.msg)
+		fmt.Printf("  %s  %s %s\n", ui.HashStyle.Render(s.id), ui.DateStyle.Render(fmt.Sprintf("%-15s", s.time)), s.msg)
 	}
 	fmt.Println()
 

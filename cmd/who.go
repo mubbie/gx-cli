@@ -182,7 +182,7 @@ func whoRepo(n int, since string) error {
 
 		displayName := c.name
 		if isYou {
-			displayName = "You"
+			displayName = ui.SuccessStyle.Bold(true).Render("You")
 		}
 
 		var emailList []string
@@ -195,9 +195,9 @@ func whoRepo(n int, since string) error {
 		rows = append(rows, []string{
 			fmt.Sprintf("%d", i+1),
 			displayName,
-			strings.Join(emailList, ", "),
+			ui.DimStyle.Render(strings.Join(emailList, ", ")),
 			fmt.Sprintf("%d", c.commits),
-			lastActive,
+			ui.DateStyle.Render(lastActive),
 		})
 	}
 

@@ -75,7 +75,9 @@ func runDrift(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%s is %d ahead, %d behind %s\n\n", ui.BoldStyle.Render(current), ahead, behind, ui.BoldStyle.Render(target))
+	aheadStr := ui.AddStyle.Render(fmt.Sprintf("%d ahead", ahead))
+	behindStr := ui.DelStyle.Render(fmt.Sprintf("%d behind", behind))
+	fmt.Printf("%s is %s, %s %s\n\n", ui.BranchStyle.Render(current), aheadStr, behindStr, ui.BranchStyle.Render(target))
 
 	maxCommits := 20
 	if full {
@@ -122,6 +124,6 @@ func showCommits(from, to string, limit int) {
 			continue
 		}
 		age := git.TimeAgo(parts[1])
-		fmt.Printf("  %s  %-12s %s\n", ui.DimStyle.Render(parts[0]), age, parts[3])
+		fmt.Printf("  %s  %s %s\n", ui.HashStyle.Render(parts[0]), ui.DateStyle.Render(fmt.Sprintf("%-12s", age)), parts[3])
 	}
 }

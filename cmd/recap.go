@@ -97,7 +97,7 @@ func recapAuthor(author, since string, days, limit int, repoName string) error {
 			currentDate = dateLabel
 			fmt.Printf("  %s\n", ui.BoldStyle.Render(dateLabel+":"))
 		}
-		fmt.Printf("    %s  %s  %s\n", ui.DimStyle.Render(parts[0]), t.Format("15:04"), parts[2])
+		fmt.Printf("    %s  %s  %s\n", ui.HashStyle.Render(parts[0]), ui.DateStyle.Render(t.Format("15:04")), parts[2])
 	}
 
 	fmt.Printf("\n  %d commits\n", commitCount)
@@ -144,10 +144,16 @@ func recapAll(since string, days, limit int, repoName string) error {
 		if author == currentUser {
 			display = "You"
 		}
-		fmt.Printf("  %s (%d commit%s):\n", ui.BoldStyle.Render(display), len(commits), ui.Plural(len(commits)))
+		displayStyled := ui.BoldStyle.Render(display)
+		if display == "You" {
+			displayStyled = ui.SuccessStyle.Bold(true).Render(display)
+		} else {
+			displayStyled = ui.AuthorStyle.Bold(true).Render(display)
+		}
+		fmt.Printf("  %s (%d commit%s):\n", displayStyled, len(commits), ui.Plural(len(commits)))
 		for _, c := range commits {
 			t, _ := time.Parse(time.RFC3339, c.date)
-			fmt.Printf("    %s  %s  %s\n", ui.DimStyle.Render(c.hash), t.Format("15:04"), c.msg)
+			fmt.Printf("    %s  %s  %s\n", ui.HashStyle.Render(c.hash), ui.DateStyle.Render(t.Format("15:04")), c.msg)
 		}
 		fmt.Println()
 		total += len(commits)

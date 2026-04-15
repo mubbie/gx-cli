@@ -134,7 +134,7 @@ func pickBranch(branches []branchInfo) string {
 		} else {
 			for i, b := range filtered {
 				age := git.TimeAgo(b.date)
-				fmt.Printf("  %3d  %-40s %-15s %s\n", i+1, b.name, age, b.author)
+				fmt.Printf("  %s  %-40s %s %s\n", ui.DimStyle.Render(fmt.Sprintf("%3d", i+1)), ui.BranchStyle.Render(b.name), ui.DateStyle.Render(fmt.Sprintf("%-15s", age)), ui.AuthorStyle.Render(b.author))
 			}
 		}
 
