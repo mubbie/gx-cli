@@ -193,10 +193,10 @@ func whoRepo(n int, since string) error {
 
 		lastActive := getAuthorLastEdit(c.name, ".")
 		rows = append(rows, []string{
-			fmt.Sprintf("%d", i+1),
+			ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
 			displayName,
 			ui.DimStyle.Render(strings.Join(emailList, ", ")),
-			fmt.Sprintf("%d", c.commits),
+			ui.BoldStyle.Render(fmt.Sprintf("%d", c.commits)),
 			ui.DateStyle.Render(lastActive),
 		})
 	}
