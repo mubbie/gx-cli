@@ -54,7 +54,7 @@ def _get_author_last_edit(author: str, path: str, cwd: str | None = None) -> str
         return "unknown"
 
 
-def _repo_level(n: int, since: str | None, show_email: bool) -> None:
+def _repo_level(n: int, since: str | None, show_email: bool = False) -> None:
     """Show top contributors to the entire repo."""
     args = ["shortlog", "-sne", "--all"]
     if since:
@@ -121,8 +121,9 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
             else:
                 key_to_idx[key] = idx
 
-    # Merge grouped entries
+    # Merge grouped entries, collecting all emails per group
     groups: dict[int, dict[str, str | int]] = {}
+    group_emails: dict[int, set[str]] = {}
     for idx, entry in enumerate(raw_entries):
         root = find(idx)
         e_name = str(entry["name"])
@@ -130,15 +131,20 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
         e_commits = int(entry["commits"])
         if root in groups:
             groups[root]["commits"] = int(groups[root]["commits"]) + e_commits
-            # Keep the longest name (most likely the real full name)
             if len(e_name) > len(str(groups[root]["name"])):
                 groups[root]["name"] = e_name
-            if e_email and not groups[root]["email"]:
-                groups[root]["email"] = e_email
         else:
             groups[root] = {"name": e_name, "email": e_email, "commits": e_commits}
+            group_emails[root] = set()
+        if e_email:
+            group_emails[root].add(e_email)
 
     contributors = sorted(groups.values(), key=lambda c: c["commits"], reverse=True)
+    # Build ordered email sets matching contributor order
+    contributor_emails = [
+        group_emails[root]
+        for root in sorted(groups.keys(), key=lambda r: int(groups[r]["commits"]), reverse=True)
+    ]
 
     # Get current git user (both name and email for matching)
     try:
@@ -153,20 +159,19 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
     rows = []
     for i, c in enumerate(contributors[:n], 1):
         name = str(c["name"])
-        email_addr = str(c["email"])
+        emails = sorted(contributor_emails[i - 1]) if i - 1 < len(contributor_emails) else []
         is_you = (
-            (current_user_email and email_addr == current_user_email)
+            (current_user_email and current_user_email in {e.lower() for e in emails})
             or (current_user_name and name == current_user_name)
         )
         display_name = "You" if is_you else name
-        if show_email and email_addr:
-            display_name += f" <{email_addr}>"
+        email_col = ", ".join(emails) if emails else ""
         last_active = _get_author_last_edit(name, ".")
-        rows.append([str(i), display_name, str(c["commits"]), last_active])
+        rows.append([str(i), display_name, email_col, str(c["commits"]), last_active])
 
     console.print()
     print_table(
-        headers=["#", "Author", "Commits", "Last Active"],
+        headers=["#", "Author", "Email", "Commits", "Last Active"],
         rows=rows,
         title="Top contributors",
     )
