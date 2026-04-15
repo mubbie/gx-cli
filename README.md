@@ -10,7 +10,7 @@ Git Productivity Toolkit
 
 ## Install
 
-**Homebrew** (macOS / Linux):
+**Homebrew** (macOS / Linux, recommended):
 
 ```
 brew tap mubbie/tap
@@ -21,6 +21,12 @@ brew install gx-git
 
 ```
 go install github.com/mubbie/gx-cli@latest
+```
+
+**pip / pipx** (Python 3.9+):
+
+```
+pipx install gx-git
 ```
 
 **Binary download:**
