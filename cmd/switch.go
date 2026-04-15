@@ -132,9 +132,31 @@ func pickBranch(branches []branchInfo) string {
 		if len(filtered) == 0 {
 			fmt.Println(ui.DimStyle.Render("  No branches match your search."))
 		} else {
+			// Calculate max branch name width from data, capped at 45
+			maxNameLen := 0
+			for _, b := range filtered {
+				if len(b.name) > maxNameLen {
+					maxNameLen = len(b.name)
+				}
+			}
+			if maxNameLen > 45 {
+				maxNameLen = 45
+			}
+			if maxNameLen < 10 {
+				maxNameLen = 10
+			}
+			nameFmt := fmt.Sprintf("%%-%ds", maxNameLen)
 			for i, b := range filtered {
+				name := b.name
+				if len(name) > 45 {
+					name = name[:42] + "..."
+				}
 				age := git.TimeAgo(b.date)
-				fmt.Printf("  %s  %-40s %s %s\n", ui.DimStyle.Render(fmt.Sprintf("%3d", i+1)), ui.BranchStyle.Render(b.name), ui.DateStyle.Render(fmt.Sprintf("%-15s", age)), ui.AuthorStyle.Render(b.author))
+				fmt.Printf("  %s  %s %s %s\n",
+					ui.DimStyle.Render(fmt.Sprintf("%3d", i+1)),
+					ui.BranchStyle.Render(fmt.Sprintf(nameFmt, name)),
+					ui.DateStyle.Render(fmt.Sprintf("%-15s", age)),
+					ui.AuthorStyle.Render(b.author))
 			}
 		}
 

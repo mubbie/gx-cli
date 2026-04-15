@@ -5,7 +5,9 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mubbie/gx-cli/internal/git"
+	shelftui "github.com/mubbie/gx-cli/internal/tui/shelf"
 	"github.com/mubbie/gx-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -13,7 +15,7 @@ import (
 var shelfCmd = &cobra.Command{
 	Use:   "shelf",
 	Short: "Visual stash manager",
-	RunE:  runShelfList, // Default: show list
+	RunE:  runShelfTUI, // Default: launch interactive TUI
 }
 
 func init() {
@@ -92,6 +94,63 @@ func getStashList() []stashEntry {
 	return entries
 }
 
+func runShelfTUI(cmd *cobra.Command, args []string) error {
+	if err := git.EnsureRepo(); err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
+
+	stashes := getStashList()
+	if len(stashes) == 0 {
+		ui.PrintInfo("No stashes. Use `gx shelf push` to stash your work.")
+		return nil
+	}
+
+	// Convert to TUI entries
+	entries := make([]shelftui.StashEntry, len(stashes))
+	for i, s := range stashes {
+		entries[i] = shelftui.StashEntry{
+			Index:   s.index,
+			ID:      s.id,
+			Time:    s.time,
+			Message: s.msg,
+			Branch:  s.branch,
+		}
+	}
+
+	model := shelftui.New(entries)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("TUI error: %s", err))
+		return nil
+	}
+
+	result := finalModel.(shelftui.Model).Result()
+	switch result.Type {
+	case "pop":
+		if _, err := git.Run("stash", "pop", result.ID); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to pop %s: %s", result.ID, err))
+		} else {
+			ui.PrintSuccess(fmt.Sprintf("Popped %s", result.ID))
+		}
+	case "apply":
+		if _, err := git.Run("stash", "apply", result.ID); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to apply %s: %s", result.ID, err))
+		} else {
+			ui.PrintSuccess(fmt.Sprintf("Applied %s", result.ID))
+		}
+	case "drop":
+		if _, err := git.Run("stash", "drop", result.ID); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to drop %s: %s", result.ID, err))
+		} else {
+			ui.PrintSuccess(fmt.Sprintf("Dropped %s", result.ID))
+		}
+	}
+
+	return nil
+}
+
 func runShelfPush(cmd *cobra.Command, args []string) error {
 	if err := git.EnsureRepo(); err != nil {
 		ui.PrintError(err.Error())
@@ -161,7 +220,11 @@ func runShelfList(cmd *cobra.Command, args []string) error {
 		} else {
 			b = ui.BranchStyle.Render(b)
 		}
-		rows = append(rows, []string{ui.HashStyle.Render(fmt.Sprintf("%d", s.index)), ui.DateStyle.Render(s.time), b, s.msg})
+		msg := s.msg
+		if len(msg) > 60 {
+			msg = msg[:57] + "..."
+		}
+		rows = append(rows, []string{ui.HashStyle.Render(fmt.Sprintf("%d", s.index)), ui.DateStyle.Render(s.time), b, msg})
 	}
 	ui.PrintTable([]string{"#", "Age", "Branch", "Message"}, rows, "")
 	return nil
