@@ -44,13 +44,15 @@ func init() {
 }
 
 type stashEntry struct {
-	index  int
-	id     string
-	hash   string
-	time   string
-	msg    string
-	branch string
-	files  string // e.g. "3 files changed"
+	index    int
+	id       string
+	hash     string
+	time     string
+	msg      string
+	branch   string
+	numFiles int
+	adds     int
+	dels     int
 }
 
 func getStashList() []stashEntry {
@@ -83,28 +85,38 @@ func getStashList() []stashEntry {
 			}
 		}
 
-		// Get file stats
-		stat := git.RunUnchecked("stash", "show", "--stat", parts[0])
-		files := ""
-		if stat != "" {
-			lines := strings.Split(stat, "\n")
-			for _, l := range lines {
-				l = strings.TrimSpace(l)
-				if strings.Contains(l, "file") && strings.Contains(l, "changed") {
-					files = l
-					break
+		// Get file stats (shortstat is one line: " 3 files changed, 12 insertions(+), 5 deletions(-)")
+		numFiles, adds, dels := 0, 0, 0
+		statLine := git.RunUnchecked("stash", "show", "--shortstat", parts[0])
+		if statLine != "" {
+			fmt.Sscanf(strings.TrimSpace(statLine), "%d", &numFiles)
+			if i := strings.Index(statLine, "insertion"); i > 0 {
+				// walk back to find the number
+				sub := strings.TrimSpace(statLine[:i])
+				if ci := strings.LastIndex(sub, ","); ci >= 0 {
+					fmt.Sscanf(strings.TrimSpace(sub[ci+1:]), "%d", &adds)
+				} else if ci := strings.LastIndex(sub, " "); ci >= 0 {
+					fmt.Sscanf(strings.TrimSpace(sub[ci+1:]), "%d", &adds)
+				}
+			}
+			if i := strings.Index(statLine, "deletion"); i > 0 {
+				sub := strings.TrimSpace(statLine[:i])
+				if ci := strings.LastIndex(sub, ","); ci >= 0 {
+					fmt.Sscanf(strings.TrimSpace(sub[ci+1:]), "%d", &dels)
 				}
 			}
 		}
 
 		entries = append(entries, stashEntry{
-			index:  idx,
-			id:     parts[0],
-			hash:   parts[1],
-			time:   parts[2],
-			msg:    msg,
-			branch: branch,
-			files:  files,
+			index:    idx,
+			id:       parts[0],
+			hash:     parts[1],
+			time:     parts[2],
+			msg:      msg,
+			branch:   branch,
+			numFiles: numFiles,
+			adds:     adds,
+			dels:     dels,
 		})
 	}
 	return entries
@@ -144,19 +156,7 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 			fmt.Println(ui.DimStyle.Render("  No stashes match your search."))
 		} else {
 			for _, s := range filtered {
-				msg := s.msg
-				if len(msg) > 55 {
-					msg = msg[:52] + "..."
-				}
-				filesInfo := ""
-				if s.files != "" {
-					filesInfo = ui.DimStyle.Render("  " + s.files)
-				}
-				fmt.Printf("  %s  %s  %s%s\n",
-					ui.HashStyle.Render(fmt.Sprintf("%2d", s.index)),
-					ui.DateStyle.Render(fmt.Sprintf("%-14s", s.time)),
-					msg,
-					filesInfo)
+				renderStashEntry(s)
 			}
 		}
 
@@ -295,22 +295,42 @@ func runShelfList(cmd *cobra.Command, args []string) error {
 	fmt.Printf("\n%d stash%s:\n\n", len(stashes), ui.PluralES(len(stashes)))
 
 	for _, s := range stashes {
-		msg := s.msg
-		if len(msg) > 55 {
-			msg = msg[:52] + "..."
-		}
-		filesInfo := ""
-		if s.files != "" {
-			filesInfo = ui.DimStyle.Render("  " + s.files)
-		}
-		fmt.Printf("  %s  %s  %s%s\n",
-			ui.HashStyle.Render(fmt.Sprintf("%2d", s.index)),
-			ui.DateStyle.Render(fmt.Sprintf("%-14s", s.time)),
-			msg,
-			filesInfo)
+		renderStashEntry(s)
 	}
 	fmt.Println()
 	return nil
+}
+
+func renderStashEntry(s stashEntry) {
+	msg := s.msg
+	if len(msg) > 60 {
+		msg = msg[:57] + "..."
+	}
+
+	// Line 1: index, age, message
+	fmt.Printf("  %s  %s  %s\n",
+		ui.HashStyle.Render(fmt.Sprintf("%2d", s.index)),
+		ui.DateStyle.Render(fmt.Sprintf("%-16s", s.time)),
+		msg)
+
+	// Line 2: branch + stats (indented under message)
+	var details []string
+	if s.branch != "" {
+		details = append(details, ui.BranchStyle.Render(s.branch))
+	}
+	if s.numFiles > 0 {
+		stat := fmt.Sprintf("%d file%s", s.numFiles, ui.Plural(s.numFiles))
+		if s.adds > 0 {
+			stat += ui.AddStyle.Render(fmt.Sprintf(" +%d", s.adds))
+		}
+		if s.dels > 0 {
+			stat += ui.DelStyle.Render(fmt.Sprintf(" -%d", s.dels))
+		}
+		details = append(details, stat)
+	}
+	if len(details) > 0 {
+		fmt.Printf("      %s  %s\n", strings.Repeat(" ", 16), ui.DimStyle.Render(strings.Join(details, "  ")))
+	}
 }
 
 func runShelfClear(cmd *cobra.Command, args []string) error {
