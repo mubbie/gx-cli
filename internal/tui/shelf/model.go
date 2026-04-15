@@ -2,6 +2,7 @@ package shelf
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -11,6 +12,7 @@ import (
 	"github.com/mubbie/gx-cli/internal/git"
 )
 
+// StashEntry represents a single stash.
 type StashEntry struct {
 	Index   int
 	ID      string
@@ -19,14 +21,6 @@ type StashEntry struct {
 	Branch  string
 }
 
-func (s StashEntry) Title() string       { return s.ID + "  " + s.Time }
-func (s StashEntry) Description() string {
-	msg := s.Message
-	if len(msg) > 60 {
-		msg = msg[:57] + "..."
-	}
-	return msg
-}
 func (s StashEntry) FilterValue() string { return s.Message + " " + s.Branch }
 
 type diffLoadedMsg struct {
@@ -34,11 +28,62 @@ type diffLoadedMsg struct {
 	diff string
 }
 
+// Action is the result returned from the TUI.
 type Action struct {
 	Type string // "pop", "apply", "drop", ""
 	ID   string
 }
 
+// compactDelegate renders each stash as two short lines.
+type compactDelegate struct {
+	maxWidth int
+}
+
+func (d compactDelegate) Height() int                          { return 3 }
+func (d compactDelegate) Spacing() int                         { return 0 }
+func (d compactDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
+func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	entry, ok := item.(StashEntry)
+	if !ok {
+		return
+	}
+
+	selected := index == m.Index()
+
+	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	msgStyle := lipgloss.NewStyle()
+	if selected {
+		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
+		msgStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	}
+
+	// Title line: stash ID + time
+	title := fmt.Sprintf("%s   %s", entry.ID, entry.Time)
+	maxW := d.maxWidth - 4
+	if maxW < 20 {
+		maxW = 20
+	}
+	if len(title) > maxW {
+		title = title[:maxW-3] + "..."
+	}
+
+	// Message line: truncated
+	msg := entry.Message
+	if len(msg) > maxW {
+		msg = msg[:maxW-3] + "..."
+	}
+
+	cursor := "  "
+	if selected {
+		cursor = lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Render("> ")
+	}
+
+	fmt.Fprintf(w, "%s%s\n", cursor, titleStyle.Render(title))
+	fmt.Fprintf(w, "  %s\n", msgStyle.Render(msg))
+	fmt.Fprintln(w) // spacing line
+}
+
+// Model is the Bubble Tea model for the shelf TUI.
 type Model struct {
 	list      list.Model
 	viewport  viewport.Model
@@ -53,20 +98,19 @@ type Model struct {
 }
 
 var (
-	listStyle     = lipgloss.NewStyle().Padding(1, 2)
-	viewportStyle = lipgloss.NewStyle().Padding(1, 2).BorderLeft(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
-	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Padding(0, 2)
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).Padding(0, 2)
+	listStyle     = lipgloss.NewStyle().Padding(1, 1)
+	viewportStyle = lipgloss.NewStyle().Padding(1, 1).BorderLeft(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
+	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Padding(0, 1)
 )
 
+// New creates a shelf TUI model.
 func New(stashes []StashEntry) Model {
 	items := make([]list.Item, len(stashes))
 	for i, s := range stashes {
 		items[i] = s
 	}
 
-	delegate := list.NewDefaultDelegate()
-	delegate.ShowDescription = true
+	delegate := compactDelegate{maxWidth: 50}
 
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "gx shelf"
@@ -109,10 +153,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		listWidth := msg.Width * 40 / 100
 		vpWidth := msg.Width - listWidth - 3
-		m.list.SetSize(listWidth, msg.Height-2)
-		m.viewport = viewport.New(vpWidth, msg.Height-4)
+		m.list.SetSize(listWidth, msg.Height-3)
+		m.viewport = viewport.New(vpWidth, msg.Height-3)
 		m.ready = true
-		// Reload current diff
+
 		if item, ok := m.list.SelectedItem().(StashEntry); ok {
 			if cached, ok := m.diffCache[item.ID]; ok {
 				m.viewport.SetContent(colorDiff(cached))
@@ -170,7 +214,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = newList
 		cmds = append(cmds, cmd)
 
-		// If selection changed, load new diff
 		newItem := m.list.SelectedItem()
 		if prevItem != newItem {
 			if entry, ok := newItem.(StashEntry); ok {
@@ -195,8 +238,11 @@ func (m Model) View() string {
 		return ""
 	}
 
-	listView := listStyle.Width(m.width * 40 / 100).Height(m.height - 2).Render(m.list.View())
-	vpView := viewportStyle.Width(m.width - m.width*40/100 - 3).Height(m.height - 2).Render(m.viewport.View())
+	listWidth := m.width * 40 / 100
+	vpWidth := m.width - listWidth - 3
+
+	listView := listStyle.Width(listWidth).Height(m.height - 2).Render(m.list.View())
+	vpView := viewportStyle.Width(vpWidth).Height(m.height - 2).Render(m.viewport.View())
 
 	main := lipgloss.JoinHorizontal(lipgloss.Top, listView, vpView)
 	help := helpStyle.Render("enter pop | space apply | d drop | / filter | tab focus | esc quit")
@@ -204,6 +250,7 @@ func (m Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, main, help)
 }
 
+// Result returns the action chosen by the user.
 func (m Model) Result() Action { return m.action }
 
 func colorDiff(diff string) string {
@@ -231,6 +278,3 @@ func colorDiff(diff string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-// Unused import guard
-var _ = fmt.Sprintf

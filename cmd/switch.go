@@ -47,9 +47,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if !git.IsClean() {
-		ui.PrintWarning("You have uncommitted changes. They may conflict with the target branch.")
-	}
+	warnIfDirty()
 
 	branches := getBranches()
 	if len(branches) == 0 {
@@ -132,7 +130,6 @@ func pickBranch(branches []branchInfo) string {
 		if len(filtered) == 0 {
 			fmt.Println(ui.DimStyle.Render("  No branches match your search."))
 		} else {
-			// Calculate max branch name width from data, capped at 45
 			maxNameLen := 0
 			for _, b := range filtered {
 				if len(b.name) > maxNameLen {
@@ -172,7 +169,6 @@ func pickBranch(branches []branchInfo) string {
 			return ""
 		}
 
-		// Try as number
 		if n, err := strconv.Atoi(choice); err == nil {
 			idx := n - 1
 			if idx >= 0 && idx < len(filtered) {
