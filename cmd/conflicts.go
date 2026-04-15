@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var conflictRe = regexp.MustCompile(`Merge conflict in (.+)`)
+
 func init() {
 	cmd := &cobra.Command{
 		Use:   "conflicts [target]",
@@ -67,8 +69,7 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// Parse error output for conflicts
 		errStr := err.Error()
-		re := regexp.MustCompile(`Merge conflict in (.+)`)
-		matches := re.FindAllStringSubmatch(errStr, -1)
+		matches := conflictRe.FindAllStringSubmatch(errStr, -1)
 		for _, m := range matches {
 			if len(m) > 1 {
 				conflicts = append(conflicts, strings.TrimSpace(m[1]))
@@ -76,10 +77,9 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// Check output for CONFLICT lines
-		re := regexp.MustCompile(`Merge conflict in (.+)`)
 		for _, line := range strings.Split(out, "\n") {
 			if strings.HasPrefix(line, "CONFLICT") {
-				matches := re.FindStringSubmatch(line)
+				matches := conflictRe.FindStringSubmatch(line)
 				if len(matches) > 1 {
 					conflicts = append(conflicts, strings.TrimSpace(matches[1]))
 				}
@@ -117,7 +117,7 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%s %d conflict%s found\n\n", ui.ErrorStyle.Render("X"), len(conflicts), plural(len(conflicts)))
+	fmt.Printf("%s %d conflict%s found\n\n", ui.ErrorStyle.Render("X"), len(conflicts), ui.Plural(len(conflicts)))
 	for _, f := range conflicts {
 		// Try to get authors
 		ourAuthor := git.RunUnchecked("log", "-1", "--format=%an", "--", f)
@@ -130,7 +130,7 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 	}
 
 	if cleanFiles > 0 {
-		fmt.Printf("\n  %d other file%s merge cleanly\n", cleanFiles, plural(cleanFiles))
+		fmt.Printf("\n  %d other file%s merge cleanly\n", cleanFiles, ui.Plural(cleanFiles))
 	}
 	return nil
 }

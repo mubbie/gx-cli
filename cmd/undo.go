@@ -13,6 +13,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	undoMergeConflict = "merge_conflict"
+	undoRebase        = "rebase"
+	undoStage         = "stage"
+	undoAmend         = "amend"
+	undoMergeCommit   = "merge_commit"
+	undoCommit        = "commit"
+)
+
 func init() {
 	undoCmd := &cobra.Command{
 		Use:   "undo",
@@ -44,27 +53,27 @@ func detectUndoState() *undoState {
 	}
 
 	// Priority 1: Merge conflict
-	if fileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
-		return &undoState{"merge_conflict", "merge conflict in progress", "git merge --abort", "Abort the merge. Returns to pre-merge state."}
+	if git.FileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
+		return &undoState{undoMergeConflict, "merge conflict in progress", "git merge --abort", "Abort the merge. Returns to pre-merge state."}
 	}
 
 	// Priority 2: Rebase
-	if dirExists(filepath.Join(root, ".git", "rebase-merge")) || dirExists(filepath.Join(root, ".git", "rebase-apply")) {
-		return &undoState{"rebase", "rebase in progress", "git rebase --abort", "Abort the rebase. Returns to pre-rebase state."}
+	if git.DirExists(filepath.Join(root, ".git", "rebase-merge")) || git.DirExists(filepath.Join(root, ".git", "rebase-apply")) {
+		return &undoState{undoRebase, "rebase in progress", "git rebase --abort", "Abort the rebase. Returns to pre-rebase state."}
 	}
 
 	// Priority 3: Staged files
 	staged := git.RunUnchecked("diff", "--cached", "--name-only")
 	if staged != "" {
 		count := len(strings.Split(staged, "\n"))
-		return &undoState{"stage", fmt.Sprintf("%d staged file%s", count, plural(count)), "git reset HEAD", "Unstage all files. Changes stay in your working tree."}
+		return &undoState{undoStage, fmt.Sprintf("%d staged file%s", count, ui.Plural(count)), "git reset HEAD", "Unstage all files. Changes stay in your working tree."}
 	}
 
 	// Priority 4+: Reflog
 	reflog, _ := git.Lines("reflog", "--format=%gs", "-n", "10")
 	for _, action := range reflog {
 		if strings.Contains(strings.ToLower(action), "amend") {
-			return &undoState{"amend", "amended commit", "git reset --soft HEAD@{1}", "Restore pre-amend state. Your changes will be preserved."}
+			return &undoState{undoAmend, "amended commit", "git reset --soft HEAD@{1}", "Restore pre-amend state. Your changes will be preserved."}
 		}
 		if strings.HasPrefix(strings.ToLower(action), "commit") {
 			_, short, msg, _, date := git.LastCommit()
@@ -74,9 +83,9 @@ func detectUndoState() *undoState {
 			// Check merge commit
 			parents := git.RunUnchecked("rev-list", "--parents", "-n", "1", "HEAD")
 			if len(strings.Fields(parents)) > 2 {
-				return &undoState{"merge_commit", fmt.Sprintf("merge commit \"%s\" (%s)", msg, short), "git reset --hard HEAD~1", "Reset to before the merge commit. WARNING: hard reset."}
+				return &undoState{undoMergeCommit, fmt.Sprintf("merge commit \"%s\" (%s)", msg, short), "git reset --hard HEAD~1", "Reset to before the merge commit. WARNING: hard reset."}
 			}
-			return &undoState{"commit", fmt.Sprintf("commit \"%s\" (%s, %s)", msg, short, git.TimeAgo(date)), "git reset --soft HEAD~1", "Soft reset to previous commit. Your changes will be preserved in staging."}
+			return &undoState{undoCommit, fmt.Sprintf("commit \"%s\" (%s, %s)", msg, short, git.TimeAgo(date)), "git reset --soft HEAD~1", "Soft reset to previous commit. Your changes will be preserved in staging."}
 		}
 		break
 	}
@@ -135,18 +144,18 @@ func runUndo(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	switch state.Type {
-	case "stage":
+	case undoStage:
 		ui.PrintSuccess("Unstaged files. Your changes are preserved in the working tree.")
-	case "commit":
+	case undoCommit:
 		ui.PrintSuccess("Undone. Your changes from that commit are now staged.")
 		ui.PrintInfo("Run `gx redo` to reverse this.")
-	case "merge_conflict":
+	case undoMergeConflict:
 		ui.PrintSuccess("Merge aborted. Working tree restored to pre-merge state.")
-	case "rebase":
+	case undoRebase:
 		ui.PrintSuccess("Rebase aborted. Working tree restored to pre-rebase state.")
-	case "amend":
+	case undoAmend:
 		ui.PrintSuccess("Restored pre-amend state.")
-	case "merge_commit":
+	case undoMergeCommit:
 		ui.PrintSuccess("Merge commit undone.")
 	default:
 		ui.PrintSuccess("Undone.")

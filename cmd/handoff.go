@@ -147,7 +147,7 @@ func formatHandoffPlain(branch, base string, isStacked bool, commits []handoffCo
 func formatHandoffMD(branch, base string, commits []handoffCommit, stat string, files []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## %s\n", branch)
-	fmt.Fprintf(&b, "**Base:** %s · **%d commit%s** · %s\n", base, len(commits), plural(len(commits)), stat)
+	fmt.Fprintf(&b, "**Base:** %s · **%d commit%s** · %s\n", base, len(commits), ui.Plural(len(commits)), stat)
 	fmt.Fprintf(&b, "\n### Commits\n")
 	for _, c := range commits {
 		fmt.Fprintf(&b, "- `%s` %s\n", c.hash, c.msg)

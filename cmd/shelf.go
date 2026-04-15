@@ -151,7 +151,7 @@ func runShelfList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("\n%d stash%s:\n\n", len(stashes), esPlural(len(stashes)))
+	fmt.Printf("\n%d stash%s:\n\n", len(stashes), ui.PluralES(len(stashes)))
 
 	var rows [][]string
 	for _, s := range stashes {
@@ -204,9 +204,3 @@ func runShelfClear(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func esPlural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "es"
-}

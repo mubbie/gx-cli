@@ -17,13 +17,8 @@ func init() {
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
-	if err := git.EnsureRepo(); err != nil {
-		ui.PrintError(err.Error())
-		return nil
-	}
-	current, err := git.CurrentBranch()
+	current, err := requireBranch()
 	if err != nil {
-		ui.PrintError(err.Error())
 		return nil
 	}
 	children := stack.Children(current)
@@ -39,11 +34,8 @@ func runUp(cmd *cobra.Command, args []string) error {
 		ui.PrintInfo("Use `gx switch` to pick one.")
 		return nil
 	}
-	if !git.IsClean() {
-		ui.PrintWarning("You have uncommitted changes. They may conflict with the target branch.")
-	}
-	if _, err := git.Run("checkout", children[0]); err != nil {
-		ui.PrintError(fmt.Sprintf("Failed to switch: %s", err))
+	warnIfDirty()
+	if err := switchTo(children[0]); err != nil {
 		return nil
 	}
 	ui.PrintSuccess(fmt.Sprintf("Moved up: %s -> %s", current, children[0]))
@@ -51,13 +43,8 @@ func runUp(cmd *cobra.Command, args []string) error {
 }
 
 func runDown(cmd *cobra.Command, args []string) error {
-	if err := git.EnsureRepo(); err != nil {
-		ui.PrintError(err.Error())
-		return nil
-	}
-	current, err := git.CurrentBranch()
+	current, err := requireBranch()
 	if err != nil {
-		ui.PrintError(err.Error())
 		return nil
 	}
 	parent := stack.Parent(current)
@@ -65,11 +52,8 @@ func runDown(cmd *cobra.Command, args []string) error {
 		ui.PrintInfo(fmt.Sprintf("%s is not in the stack. Use `gx switch` to navigate.", current))
 		return nil
 	}
-	if !git.IsClean() {
-		ui.PrintWarning("You have uncommitted changes. They may conflict with the target branch.")
-	}
-	if _, err := git.Run("checkout", parent); err != nil {
-		ui.PrintError(fmt.Sprintf("Failed to switch: %s", err))
+	warnIfDirty()
+	if err := switchTo(parent); err != nil {
 		return nil
 	}
 	if parent == git.HeadBranch() {
@@ -81,13 +65,8 @@ func runDown(cmd *cobra.Command, args []string) error {
 }
 
 func runTop(cmd *cobra.Command, args []string) error {
-	if err := git.EnsureRepo(); err != nil {
-		ui.PrintError(err.Error())
-		return nil
-	}
-	current, err := git.CurrentBranch()
+	current, err := requireBranch()
 	if err != nil {
-		ui.PrintError(err.Error())
 		return nil
 	}
 
@@ -115,11 +94,8 @@ func runTop(cmd *cobra.Command, args []string) error {
 		ui.PrintInfo("Already at the top of the stack.")
 		return nil
 	}
-	if !git.IsClean() {
-		ui.PrintWarning("You have uncommitted changes.")
-	}
-	if _, err := git.Run("checkout", target); err != nil {
-		ui.PrintError(fmt.Sprintf("Failed to switch: %s", err))
+	warnIfDirty()
+	if err := switchTo(target); err != nil {
 		return nil
 	}
 	ui.PrintSuccess(fmt.Sprintf("Jumped to top: %s -> %s", current, target))
@@ -127,13 +103,8 @@ func runTop(cmd *cobra.Command, args []string) error {
 }
 
 func runBottom(cmd *cobra.Command, args []string) error {
-	if err := git.EnsureRepo(); err != nil {
-		ui.PrintError(err.Error())
-		return nil
-	}
-	current, err := git.CurrentBranch()
+	current, err := requireBranch()
 	if err != nil {
-		ui.PrintError(err.Error())
 		return nil
 	}
 
@@ -148,11 +119,8 @@ func runBottom(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 		if len(children) == 1 {
-			if !git.IsClean() {
-				ui.PrintWarning("You have uncommitted changes.")
-			}
-			if _, err := git.Run("checkout", children[0]); err != nil {
-				ui.PrintError(fmt.Sprintf("Failed to switch: %s", err))
+			warnIfDirty()
+			if err := switchTo(children[0]); err != nil {
 				return nil
 			}
 			ui.PrintSuccess(fmt.Sprintf("Jumped to bottom: %s -> %s", current, children[0]))
@@ -190,11 +158,8 @@ func runBottom(cmd *cobra.Command, args []string) error {
 		ui.PrintInfo("Already at the bottom of the stack.")
 		return nil
 	}
-	if !git.IsClean() {
-		ui.PrintWarning("You have uncommitted changes.")
-	}
-	if _, err := git.Run("checkout", target); err != nil {
-		ui.PrintError(fmt.Sprintf("Failed to switch: %s", err))
+	warnIfDirty()
+	if err := switchTo(target); err != nil {
 		return nil
 	}
 	ui.PrintSuccess(fmt.Sprintf("Jumped to bottom: %s -> %s", current, target))

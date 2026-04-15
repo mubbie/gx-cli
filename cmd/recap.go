@@ -64,7 +64,7 @@ func recapAuthor(author, since string, days, limit int, repoName string) error {
 	gitArgs := []string{"log", "--all", "--format=%h\t%aI\t%s", "--since=" + since, fmt.Sprintf("-%d", limit), "--author=" + author}
 	out := git.RunUnchecked(gitArgs...)
 	if out == "" {
-		ui.PrintInfo(fmt.Sprintf("No activity in the last %d day%s.", days, plural(days)))
+		ui.PrintInfo(fmt.Sprintf("No activity in the last %d day%s.", days, ui.Plural(days)))
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func recapAuthor(author, since string, days, limit int, repoName string) error {
 	}
 
 	fmt.Println()
-	dayLabel := fmt.Sprintf("%d day%s", days, plural(days))
+	dayLabel := fmt.Sprintf("%d day%s", days, ui.Plural(days))
 	fmt.Printf("%s\n\n", ui.BoldStyle.Render(fmt.Sprintf("%s activity in the last %s (%s):", display, dayLabel, repoName)))
 
 	commitCount := 0
@@ -108,7 +108,7 @@ func recapAll(since string, days, limit int, repoName string) error {
 	gitArgs := []string{"log", "--all", "--format=%h\t%aI\t%an\t%s", "--since=" + since, fmt.Sprintf("-%d", limit)}
 	out := git.RunUnchecked(gitArgs...)
 	if out == "" {
-		ui.PrintInfo(fmt.Sprintf("No activity in the last %d day%s.", days, plural(days)))
+		ui.PrintInfo(fmt.Sprintf("No activity in the last %d day%s.", days, ui.Plural(days)))
 		return nil
 	}
 
@@ -134,7 +134,7 @@ func recapAll(since string, days, limit int, repoName string) error {
 	}
 
 	fmt.Println()
-	dayLabel := fmt.Sprintf("%d day%s", days, plural(days))
+	dayLabel := fmt.Sprintf("%d day%s", days, ui.Plural(days))
 	fmt.Printf("%s\n\n", ui.BoldStyle.Render(fmt.Sprintf("Team activity in the last %s (%s):", dayLabel, repoName)))
 
 	total := 0
@@ -144,7 +144,7 @@ func recapAll(since string, days, limit int, repoName string) error {
 		if author == currentUser {
 			display = "You"
 		}
-		fmt.Printf("  %s (%d commit%s):\n", ui.BoldStyle.Render(display), len(commits), plural(len(commits)))
+		fmt.Printf("  %s (%d commit%s):\n", ui.BoldStyle.Render(display), len(commits), ui.Plural(len(commits)))
 		for _, c := range commits {
 			t, _ := time.Parse(time.RFC3339, c.date)
 			fmt.Printf("    %s  %s  %s\n", ui.DimStyle.Render(c.hash), t.Format("15:04"), c.msg)
@@ -153,7 +153,7 @@ func recapAll(since string, days, limit int, repoName string) error {
 		total += len(commits)
 	}
 
-	fmt.Printf("  %d commits from %d contributor%s\n", total, len(order), plural(len(order)))
+	fmt.Printf("  %d commits from %d contributor%s\n", total, len(order), ui.Plural(len(order)))
 	return nil
 }
 

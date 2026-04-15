@@ -32,3 +32,27 @@ func PrintDryRun(actions []string) {
 	}
 	fmt.Println()
 }
+
+// Plural returns "s" when n != 1, empty string otherwise.
+func Plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// PluralES returns "es" when n != 1, empty string otherwise.
+func PluralES(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "es"
+}
+
+// PluralIES returns "ies" when n != 1, "y" otherwise.
+func PluralIES(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
+}

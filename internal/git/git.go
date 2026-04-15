@@ -4,8 +4,10 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -86,19 +88,28 @@ func CurrentBranch() (string, error) {
 	return branch, nil
 }
 
+var (
+	headBranchOnce  sync.Once
+	headBranchCache string
+)
+
 // HeadBranch detects the repo's main/master/develop branch.
+// The result is cached for the lifetime of the process.
 func HeadBranch() string {
-	// Try remote HEAD
-	output := RunUnchecked("remote", "show", "origin")
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "HEAD branch:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				name := strings.TrimSpace(parts[1])
-				if name != "" && BranchExists(name) {
-					return name
-				}
-			}
+	headBranchOnce.Do(func() {
+		headBranchCache = detectHeadBranch()
+	})
+	return headBranchCache
+}
+
+func detectHeadBranch() string {
+	// Try local symbolic ref for origin HEAD (no network call)
+	out := RunUnchecked("symbolic-ref", "refs/remotes/origin/HEAD")
+	if out != "" {
+		// Output is e.g. "refs/remotes/origin/main"
+		name := strings.TrimPrefix(out, "refs/remotes/origin/")
+		if name != "" && BranchExists(name) {
+			return name
 		}
 	}
 
@@ -113,6 +124,18 @@ func HeadBranch() string {
 		return branch
 	}
 	return "main"
+}
+
+// FileExists checks if a file (not directory) exists at path.
+func FileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// DirExists checks if a directory exists at path.
+func DirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // RepoRoot returns the root directory of the git repo.

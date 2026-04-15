@@ -80,6 +80,10 @@ func runView(cmd *cobra.Command, args []string) error {
 	}
 
 	hasGH := isGHAvailable()
+	var prMap map[string]prInfo
+	if hasGH {
+		prMap = fetchPRMap()
+	}
 
 	fmt.Println()
 	fmt.Println(ui.BoldStyle.Render(trunk))
@@ -95,9 +99,8 @@ func runView(cmd *cobra.Command, args []string) error {
 		parts := []string{fmt.Sprintf("  <- %-30s", branch)}
 
 		if hasGH {
-			pr := getPRStatus(branch)
-			if pr != "" {
-				parts = append(parts, fmt.Sprintf("%-22s", pr))
+			if pr, ok := prMap[branch]; ok {
+				parts = append(parts, fmt.Sprintf("%-22s", formatPRStatus(pr)))
 			} else {
 				parts = append(parts, fmt.Sprintf("%-22s", "  no PR"))
 			}
@@ -166,20 +169,31 @@ func isGHAvailable() bool {
 	return err == nil
 }
 
-func getPRStatus(branch string) string {
-	cmd := exec.Command("gh", "pr", "view", branch, "--json", "number,state,reviewDecision")
+type prInfo struct {
+	Number         int    `json:"number"`
+	HeadRefName    string `json:"headRefName"`
+	State          string `json:"state"`
+	ReviewDecision string `json:"reviewDecision"`
+}
+
+func fetchPRMap() map[string]prInfo {
+	cmd := exec.Command("gh", "pr", "list", "--json", "number,headRefName,state,reviewDecision", "--limit", "100")
 	out, err := cmd.Output()
 	if err != nil {
-		return ""
+		return nil
 	}
-	var pr struct {
-		Number         int    `json:"number"`
-		State          string `json:"state"`
-		ReviewDecision string `json:"reviewDecision"`
+	var prs []prInfo
+	if json.Unmarshal(out, &prs) != nil {
+		return nil
 	}
-	if json.Unmarshal(out, &pr) != nil {
-		return ""
+	m := make(map[string]prInfo, len(prs))
+	for _, pr := range prs {
+		m[pr.HeadRefName] = pr
 	}
+	return m
+}
+
+func formatPRStatus(pr prInfo) string {
 	switch {
 	case pr.State == "MERGED":
 		return fmt.Sprintf("#%d  + merged", pr.Number)

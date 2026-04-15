@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
 	"github.com/mubbie/gx-cli/internal/ui"
@@ -84,7 +84,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 		fmt.Println("Working tree: clean")
 	} else {
 		modified, staged, untracked := 0, 0, 0
-		for _, line := range splitLines(status) {
+		for _, line := range strings.Split(status, "\n") {
 			if len(line) < 2 {
 				continue
 			}
@@ -101,13 +101,13 @@ func runContext(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println("Working tree:")
 		if modified > 0 {
-			fmt.Printf("  Modified:   %d file%s\n", modified, plural(modified))
+			fmt.Printf("  Modified:   %d file%s\n", modified, ui.Plural(modified))
 		}
 		if staged > 0 {
-			fmt.Printf("  Staged:     %d file%s\n", staged, plural(staged))
+			fmt.Printf("  Staged:     %d file%s\n", staged, ui.Plural(staged))
 		}
 		if untracked > 0 {
-			fmt.Printf("  Untracked:  %d file%s\n", untracked, plural(untracked))
+			fmt.Printf("  Untracked:  %d file%s\n", untracked, ui.Plural(untracked))
 		}
 	}
 
@@ -116,7 +116,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Stash
 	stashCount := git.StashCount()
 	if stashCount > 0 {
-		fmt.Printf("Stash:        %d entr%s\n", stashCount, pluralIES(stashCount))
+		fmt.Printf("Stash:        %d entr%s\n", stashCount, ui.PluralIES(stashCount))
 	} else {
 		fmt.Println("Stash:        empty")
 	}
@@ -124,13 +124,13 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Active operations
 	root, _ := git.RepoRoot()
 	if root != "" {
-		if fileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
+		if git.FileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
 			fmt.Println()
 			ui.PrintWarning("Merge in progress")
-		} else if dirExists(filepath.Join(root, ".git", "rebase-merge")) || dirExists(filepath.Join(root, ".git", "rebase-apply")) {
+		} else if git.DirExists(filepath.Join(root, ".git", "rebase-merge")) || git.DirExists(filepath.Join(root, ".git", "rebase-apply")) {
 			fmt.Println()
 			ui.PrintWarning("Rebase in progress")
-		} else if fileExists(filepath.Join(root, ".git", "CHERRY_PICK_HEAD")) {
+		} else if git.FileExists(filepath.Join(root, ".git", "CHERRY_PICK_HEAD")) {
 			fmt.Println()
 			ui.PrintWarning("Cherry-pick in progress")
 		}
@@ -140,52 +140,3 @@ func runContext(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
-
-func pluralIES(n int) string {
-	if n == 1 {
-		return "y"
-	}
-	return "ies"
-}
-
-func splitLines(s string) []string {
-	if s == "" {
-		return nil
-	}
-	lines := []string{}
-	for _, line := range splitBy(s, '\n') {
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-func splitBy(s string, sep byte) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep {
-			parts = append(parts, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		parts = append(parts, s[start:])
-	}
-	return parts
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
-}
-
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}

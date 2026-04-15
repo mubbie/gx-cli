@@ -67,13 +67,14 @@ func runNuke(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	mergedSet := mergedBranches(head)
+
 	if dryRun {
 		var actions []string
 		for _, b := range branches {
 			local := git.BranchExists(b)
 			remote := git.RemoteBranchExists(b)
-			merged := isMerged(b, head)
-			actions = append(actions, fmt.Sprintf("  %s  Local: %v  Remote: %v  Merged: %v", b, local, remote, merged))
+			actions = append(actions, fmt.Sprintf("  %s  Local: %v  Remote: %v  Merged: %v", b, local, remote, mergedSet[b]))
 		}
 		actions = append(actions, "", fmt.Sprintf("Would delete: %d branches", len(branches)))
 		ui.PrintDryRun(actions)
@@ -83,8 +84,7 @@ func runNuke(cmd *cobra.Command, args []string) error {
 	// Show info and warn about stack children
 	hasUnmerged := false
 	for _, b := range branches {
-		merged := isMerged(b, head)
-		if !merged {
+		if !mergedSet[b] {
 			hasUnmerged = true
 			fmt.Printf("\n  %s is NOT merged into %s.\n", b, head)
 		}
@@ -102,9 +102,8 @@ func runNuke(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, b := range branches {
-		merged := isMerged(b, head)
 		flag := "-d"
-		if !merged {
+		if !mergedSet[b] {
 			flag = "-D"
 		}
 		if git.BranchExists(b) {
@@ -213,13 +212,14 @@ func resolveBranches(pattern string) []string {
 	return matches
 }
 
-func isMerged(branch, into string) bool {
+func mergedBranches(into string) map[string]bool {
 	out := git.RunUnchecked("branch", "--merged", into)
+	set := make(map[string]bool)
 	for _, line := range strings.Split(out, "\n") {
 		name := strings.TrimSpace(strings.TrimLeft(line, "* "))
-		if name == branch {
-			return true
+		if name != "" {
+			set[name] = true
 		}
 	}
-	return false
+	return set
 }
