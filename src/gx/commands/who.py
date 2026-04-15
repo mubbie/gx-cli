@@ -65,7 +65,7 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
         return
 
     # Parse shortlog output: "  123\tName <email>"
-    contributors = []
+    raw_entries = []
     for line in output.splitlines():
         line = line.strip()
         if not line:
@@ -75,26 +75,53 @@ def _repo_level(n: int, since: str | None, show_email: bool) -> None:
             continue
         commits = int(parts[0].strip())
         name_email = parts[1].strip()
-        # Extract name and email
         if "<" in name_email and ">" in name_email:
             name = name_email[: name_email.index("<")].strip()
-            email = name_email[name_email.index("<") + 1 : name_email.index(">")]
+            email = name_email[name_email.index("<") + 1 : name_email.index(">")].lower()
         else:
             name = name_email
             email = ""
-        contributors.append({"name": name, "email": email, "commits": commits})
+        raw_entries.append({"name": name, "email": email, "commits": commits})
 
-    # Get current git user
+    # Deduplicate by email: merge entries with the same email,
+    # keep the name with the most commits as the display name
+    by_email: dict[str, dict] = {}
+    for entry in raw_entries:
+        email = entry["email"]
+        if not email:
+            # No email: use name as key
+            key = f"__name__{entry['name'].lower()}"
+        else:
+            key = email
+        if key in by_email:
+            by_email[key]["commits"] += entry["commits"]
+            # Keep the longer name (usually the real one, not a username)
+            if len(entry["name"]) > len(by_email[key]["name"]):
+                by_email[key]["name"] = entry["name"]
+        else:
+            by_email[key] = dict(entry)
+
+    contributors = sorted(by_email.values(), key=lambda c: c["commits"], reverse=True)
+
+    # Get current git user (both name and email for matching)
     try:
-        current_user = run_git(["config", "user.name"])
+        current_user_name = run_git(["config", "user.name"])
     except GitError:
-        current_user = ""
+        current_user_name = ""
+    try:
+        current_user_email = run_git(["config", "user.email"]).lower()
+    except GitError:
+        current_user_email = ""
 
     rows = []
     for i, c in enumerate(contributors[:n], 1):
         name = str(c["name"])
         email_addr = str(c["email"])
-        display_name = "You" if name == current_user else name
+        is_you = (
+            (current_user_email and email_addr == current_user_email)
+            or (current_user_name and name == current_user_name)
+        )
+        display_name = "You" if is_you else name
         if show_email and email_addr:
             display_name += f" <{email_addr}>"
         last_active = _get_author_last_edit(name, ".")
