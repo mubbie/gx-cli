@@ -67,27 +67,39 @@ func runWho(cmd *cobra.Command, args []string) error {
 func whoRepo(n int, since string, showLines bool) error {
 	sp := ui.StartSpinner("Analyzing contributors...")
 
-	// Always run shortlog (fast) + shortstat with dates in parallel
-	shortlogArgs := []string{"shortlog", "-sne", "--all"}
+	// Default: current branch only (fast). --all is expensive on repos with many branches.
+	shortlogArgs := []string{"shortlog", "-sne", "HEAD"}
 	if since != "" {
 		shortlogArgs = append(shortlogArgs, "--since="+since)
-	}
-	shortstatArgs := []string{"log", "--all", "--shortstat", "--format=%aE|%aI"}
-	if since != "" {
-		shortstatArgs = append(shortstatArgs, "--since="+since)
 	}
 
 	var shortlogOut, numstatOut string
 	var err error
 
-	// Run in parallel
-	done := make(chan struct{})
-	go func() {
-		shortlogOut, err = git.Run(shortlogArgs...)
-		close(done)
-	}()
-	numstatOut = git.RunUnchecked(shortstatArgs...)
-	<-done
+	if showLines {
+		sp = ui.StartSpinner("Analyzing contributors (scanning line history, this may take a while)...")
+		shortstatArgs := []string{"log", "--shortstat", "--format=%aE|%aI"}
+		if since != "" {
+			shortstatArgs = append(shortstatArgs, "--since="+since)
+		}
+		done := make(chan struct{})
+		go func() {
+			shortlogOut, err = git.Run(shortlogArgs...)
+			close(done)
+		}()
+		numstatOut = git.RunUnchecked(shortstatArgs...)
+		<-done
+	} else {
+		// Fast path: shortlog + recent dates only
+		done := make(chan struct{})
+		go func() {
+			shortlogOut, err = git.Run(shortlogArgs...)
+			close(done)
+		}()
+		dateArgs := []string{"log", "--format=%aE|%aI", "-500"}
+		numstatOut = git.RunUnchecked(dateArgs...)
+		<-done
+	}
 
 	// Parse shortlog
 	type rawEntry struct {
