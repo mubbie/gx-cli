@@ -3,8 +3,10 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/mubbie/gx-cli/internal/git"
 	"github.com/mubbie/gx-cli/internal/ui"
@@ -45,8 +47,19 @@ func runWho(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return whoRepo(n, since)
 	}
-	ui.PrintInfo("File/directory-level who is coming soon. Showing repo level.")
-	return whoRepo(n, since)
+
+	path := args[0]
+	// Check if it's a file or directory
+	info, err := os.Stat(path)
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Path not found: %s", path))
+		return nil
+	}
+	if info.IsDir() {
+		noLimit, _ := cmd.Flags().GetBool("no-limit")
+		return whoDir(path, n, since, noLimit)
+	}
+	return whoFile(path, n, since)
 }
 
 func whoRepo(n int, since string) error {
@@ -319,6 +332,221 @@ func whoRepo(n int, since string) error {
 
 	// Print all at once
 	fmt.Print(buf.String())
+	return nil
+}
+
+// whoFile shows line ownership for a single file via git blame.
+func whoFile(path string, n int, since string) error {
+	sp := ui.StartSpinner(fmt.Sprintf("Analyzing %s...", path))
+
+	blameArgs := []string{"blame", "--line-porcelain"}
+	if since != "" {
+		blameArgs = append(blameArgs, "--since", since)
+	}
+	blameArgs = append(blameArgs, path)
+
+	out, err := git.Run(blameArgs...)
+	sp.Stop()
+	if err != nil {
+		ui.PrintError(fmt.Sprintf("Failed to blame %s: %s", path, err))
+		return nil
+	}
+
+	// Parse blame output: count lines per author
+	counts := map[string]int{}      // author -> lines
+	emails := map[string]string{}   // author -> email
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "author ") {
+			name := strings.TrimPrefix(line, "author ")
+			if name != "Not Committed Yet" {
+				counts[name]++
+			}
+		}
+		if strings.HasPrefix(line, "author-mail ") {
+			mail := strings.TrimPrefix(line, "author-mail ")
+			mail = strings.Trim(mail, "<>")
+			// Find the last author we incremented
+			for name := range counts {
+				if _, exists := emails[name]; !exists {
+					emails[name] = strings.ToLower(mail)
+				}
+			}
+		}
+	}
+
+	total := 0
+	for _, c := range counts {
+		total += c
+	}
+	if total == 0 {
+		ui.PrintInfo(fmt.Sprintf("No blame data for %s", path))
+		return nil
+	}
+
+	// Sort by line count
+	type entry struct {
+		name  string
+		lines int
+	}
+	var sorted []entry
+	for name, lines := range counts {
+		sorted = append(sorted, entry{name, lines})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].lines > sorted[j].lines
+	})
+
+	currentName := git.RunUnchecked("config", "user.name")
+
+	var rows [][]string
+	for i, e := range sorted {
+		if i >= n {
+			break
+		}
+		displayName := e.name
+		if e.name == currentName {
+			displayName = ui.SuccessStyle.Bold(true).Render("You")
+		}
+		pct := fmt.Sprintf("%.1f%%", float64(e.lines)/float64(total)*100)
+		rows = append(rows, []string{
+			ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
+			displayName,
+			ui.BoldStyle.Render(fmt.Sprintf("%d", e.lines)),
+			pct,
+		})
+	}
+
+	fmt.Println()
+	ui.PrintTable([]string{"#", "Author", "Lines", "%"}, rows, fmt.Sprintf("Ownership of %s (%d lines)", path, total))
+	return nil
+}
+
+// whoDir shows line ownership across all files in a directory via git blame.
+func whoDir(dir string, n int, since string, noLimit bool) error {
+	sp := ui.StartSpinner(fmt.Sprintf("Analyzing %s (this may take a moment)...", dir))
+
+	// Get tracked files
+	filesOut, err := git.Run("ls-files", dir)
+	if err != nil || filesOut == "" {
+		sp.Stop()
+		ui.PrintInfo(fmt.Sprintf("No tracked files in %s", dir))
+		return nil
+	}
+
+	files := strings.Split(strings.TrimSpace(filesOut), "\n")
+	maxFiles := 200
+	if noLimit {
+		maxFiles = len(files)
+	}
+	if len(files) > maxFiles {
+		sp.Stop()
+		ui.PrintWarning(fmt.Sprintf("%s contains %d tracked files. Analyzing first %d. Use --no-limit to analyze all.", dir, len(files), maxFiles))
+		files = files[:maxFiles]
+		sp = ui.StartSpinner(fmt.Sprintf("Analyzing %d files...", len(files)))
+	}
+
+	// Blame all files concurrently (capped at 8 workers)
+	type blameResult struct {
+		counts map[string]int
+	}
+	results := make(chan blameResult, len(files))
+	sem := make(chan struct{}, 8) // concurrency limit
+	var wg sync.WaitGroup
+
+	for _, file := range files {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+		wg.Add(1)
+		go func(f string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			blameArgs := []string{"blame", "--line-porcelain"}
+			if since != "" {
+				blameArgs = append(blameArgs, "--since", since)
+			}
+			blameArgs = append(blameArgs, f)
+
+			out := git.RunUnchecked(blameArgs...)
+			counts := map[string]int{}
+			for _, line := range strings.Split(out, "\n") {
+				if strings.HasPrefix(line, "author ") {
+					name := strings.TrimPrefix(line, "author ")
+					if name != "Not Committed Yet" {
+						counts[name]++
+					}
+				}
+			}
+			results <- blameResult{counts}
+		}(file)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Aggregate
+	totalCounts := map[string]int{}
+	filesTouched := map[string]int{}
+	for r := range results {
+		for name, lines := range r.counts {
+			totalCounts[name] += lines
+			filesTouched[name]++
+		}
+	}
+
+	sp.Stop()
+
+	totalLines := 0
+	for _, c := range totalCounts {
+		totalLines += c
+	}
+	if totalLines == 0 {
+		ui.PrintInfo(fmt.Sprintf("No blame data for %s", dir))
+		return nil
+	}
+
+	type entry struct {
+		name  string
+		lines int
+		files int
+	}
+	var sorted []entry
+	for name, lines := range totalCounts {
+		sorted = append(sorted, entry{name, lines, filesTouched[name]})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].lines > sorted[j].lines
+	})
+
+	currentName := git.RunUnchecked("config", "user.name")
+
+	var rows [][]string
+	for i, e := range sorted {
+		if i >= n {
+			break
+		}
+		displayName := e.name
+		if e.name == currentName {
+			displayName = ui.SuccessStyle.Bold(true).Render("You")
+		}
+		pct := fmt.Sprintf("%.1f%%", float64(e.lines)/float64(totalLines)*100)
+		rows = append(rows, []string{
+			ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
+			displayName,
+			ui.BoldStyle.Render(fmt.Sprintf("%d", e.lines)),
+			pct,
+			ui.DimStyle.Render(fmt.Sprintf("%d", e.files)),
+		})
+	}
+
+	fmt.Println()
+	ui.PrintTable([]string{"#", "Author", "Lines", "%", "Files Touched"}, rows,
+		fmt.Sprintf("Ownership of %s (%d files, %d lines)", dir, len(files), totalLines))
 	return nil
 }
 
