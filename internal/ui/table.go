@@ -2,80 +2,66 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).MarginBottom(1)
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("4"))
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).MarginBottom(1)
+	sepStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 )
-
-const maxColWidth = 50
 
 func PrintTable(headers []string, rows [][]string, title string) {
 	if title != "" {
 		fmt.Println(titleStyle.Render(title))
 	}
 
-	// Calculate column widths based on content
+	// Calculate column widths from VISIBLE content width (ANSI-aware)
 	widths := make([]int, len(headers))
 	for i, h := range headers {
-		widths[i] = lipgloss.Width(h) + 2
+		widths[i] = len(h)
 	}
 	for _, row := range rows {
 		for i, cell := range row {
-			w := lipgloss.Width(cell) + 2
+			w := lipgloss.Width(cell)
 			if i < len(widths) && w > widths[i] {
 				widths[i] = w
 			}
 		}
 	}
 
-	// Cap non-last columns
-	lastCol := len(headers) - 1
+	// Add padding
 	for i := range widths {
-		if i != lastCol && widths[i] > maxColWidth {
-			widths[i] = maxColWidth
-		}
+		widths[i] += 2
 	}
 
-	// Build columns
-	cols := make([]table.Column, len(headers))
+	// Header
+	hParts := make([]string, len(headers))
 	for i, h := range headers {
-		cols[i] = table.Column{Title: h, Width: widths[i]}
+		hParts[i] = headerStyle.Width(widths[i]).Render(h)
 	}
+	fmt.Println(strings.Join(hParts, ""))
 
-	// Build rows
-	tableRows := make([]table.Row, len(rows))
-	for i, row := range rows {
-		r := make(table.Row, len(headers))
-		for j := range headers {
-			if j < len(row) {
-				r[j] = row[j]
+	// Separator
+	sParts := make([]string, len(headers))
+	for i := range headers {
+		sParts[i] = sepStyle.Render(strings.Repeat("─", widths[i]))
+	}
+	fmt.Println(strings.Join(sParts, ""))
+
+	// Rows - use lipgloss Width for ANSI-aware padding, MaxWidth for truncation
+	for _, row := range rows {
+		parts := make([]string, len(headers))
+		for i := range headers {
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
 			}
+			parts[i] = lipgloss.NewStyle().Width(widths[i]).MaxWidth(widths[i]).Render(cell)
 		}
-		tableRows[i] = r
+		fmt.Println(strings.Join(parts, ""))
 	}
-
-	// Style the table
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		Bold(true).
-		Foreground(lipgloss.Color("4")).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("240"))
-	s.Selected = lipgloss.NewStyle() // Disable selection highlighting for static display
-	s.Cell = s.Cell.Padding(0, 1)
-
-	t := table.New(
-		table.WithColumns(cols),
-		table.WithRows(tableRows),
-		table.WithHeight(len(tableRows)+1),
-		table.WithStyles(s),
-	)
-
-	fmt.Println(t.View())
 	fmt.Println()
 }
