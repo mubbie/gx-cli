@@ -53,19 +53,14 @@ func BuildTree() *BranchStack {
 		}
 	}
 
-	// Clean stale parent references (parent branch was deleted)
-	changed := false
+	// For display purposes, treat branches whose parent was deleted as parented to trunk.
+	// Do NOT save this - graph is read-only.
 	for name, meta := range cfg.Branches {
 		if _, exists := branchSHAs[meta.Parent]; !exists {
-			// Parent no longer exists, default to trunk
 			if meta.Parent != mainBranch {
 				cfg.Branches[name] = &BranchMeta{Parent: mainBranch, ParentHead: meta.ParentHead}
-				changed = true
 			}
 		}
-	}
-	if changed {
-		_ = cfg.Save()
 	}
 
 	// No self-healing: only show branches explicitly in stack.json.
