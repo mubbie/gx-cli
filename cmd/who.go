@@ -23,6 +23,7 @@ func init() {
 	cmd.Flags().IntP("number", "n", 5, "Number of contributors to show")
 	cmd.Flags().String("since", "", "Only consider commits after this date")
 	cmd.Flags().Bool("no-limit", false, "Remove file cap for directory analysis")
+	cmd.Flags().Bool("lines", false, "Show line stats (slower, scans full history)")
 	rootCmd.AddCommand(cmd)
 }
 
@@ -43,9 +44,10 @@ func runWho(cmd *cobra.Command, args []string) error {
 
 	n, _ := cmd.Flags().GetInt("number")
 	since, _ := cmd.Flags().GetString("since")
+	showLines, _ := cmd.Flags().GetBool("lines")
 
 	if len(args) == 0 {
-		return whoRepo(n, since)
+		return whoRepo(n, since, showLines)
 	}
 
 	path := args[0]
@@ -62,10 +64,10 @@ func runWho(cmd *cobra.Command, args []string) error {
 	return whoFile(path, n, since)
 }
 
-func whoRepo(n int, since string) error {
-	sp := ui.StartSpinner("Analyzing contributors (this may take a moment)...")
+func whoRepo(n int, since string, showLines bool) error {
+	sp := ui.StartSpinner("Analyzing contributors...")
 
-	// Run both git commands in parallel
+	// Always run shortlog (fast) + shortstat with dates in parallel
 	shortlogArgs := []string{"shortlog", "-sne", "--all"}
 	if since != "" {
 		shortlogArgs = append(shortlogArgs, "--since="+since)
@@ -77,6 +79,8 @@ func whoRepo(n int, since string) error {
 
 	var shortlogOut, numstatOut string
 	var err error
+
+	// Run in parallel
 	done := make(chan struct{})
 	go func() {
 		shortlogOut, err = git.Run(shortlogArgs...)
@@ -302,29 +306,40 @@ func whoRepo(n int, since string) error {
 			lastActive = git.TimeAgo(c.lastActive)
 		}
 
-		// Lines and percentage
-		linesStr := ui.AddStyle.Render(fmt.Sprintf("+%d", c.added)) + " " + ui.DelStyle.Render(fmt.Sprintf("-%d", c.deleted))
-		pct := ""
-		if totalLines > 0 {
-			pct = fmt.Sprintf("%.1f%%", float64(c.added)/float64(totalLines)*100)
+		if showLines {
+			linesStr := ui.AddStyle.Render(fmt.Sprintf("+%d", c.added)) + " " + ui.DelStyle.Render(fmt.Sprintf("-%d", c.deleted))
+			pct := ""
+			if totalLines > 0 {
+				pct = fmt.Sprintf("%.1f%%", float64(c.added)/float64(totalLines)*100)
+			}
+			rows = append(rows, []string{
+				ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
+				displayName,
+				linesStr,
+				pct,
+				ui.BoldStyle.Render(fmt.Sprintf("%d", c.commits)),
+				ui.DateStyle.Render(lastActive),
+			})
+		} else {
+			rows = append(rows, []string{
+				ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
+				displayName,
+				ui.BoldStyle.Render(fmt.Sprintf("%d", c.commits)),
+				ui.DateStyle.Render(lastActive),
+			})
 		}
-
-		rows = append(rows, []string{
-			ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
-			displayName,
-			linesStr,
-			pct,
-			ui.BoldStyle.Render(fmt.Sprintf("%d", c.commits)),
-			ui.DateStyle.Render(lastActive),
-		})
 	}
 
-	// Stop spinner AFTER all data is ready, BEFORE printing
 	sp.Stop()
 
 	fmt.Fprintln(&buf)
-	// Print table
-	ui.PrintTableTo(&buf, []string{"#", "Author", "Lines", "%", "Commits", "Last Active"}, rows, "Top contributors")
+	var headers []string
+	if showLines {
+		headers = []string{"#", "Author", "Lines", "%", "Commits", "Last Active"}
+	} else {
+		headers = []string{"#", "Author", "Commits", "Last Active"}
+	}
+	ui.PrintTableTo(&buf, headers, rows, "Top contributors")
 
 	if currentName != "" || currentEmail != "" {
 		fmt.Fprintf(&buf, "\n%s\n", ui.DimStyle.Render(fmt.Sprintf("You: %s <%s>", currentName, currentEmail)))
