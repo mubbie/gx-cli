@@ -116,7 +116,13 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	// Atomic write: temp file + rename
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // RecordRelationship adds or updates a parent-child relationship.
@@ -143,38 +149,26 @@ func UpdateParentHead(child, newHead string) error {
 	return nil
 }
 
-// Parent returns the parent branch name, or empty string.
-func Parent(branch string) string {
-	cfg, err := Load()
-	if err != nil {
-		return ""
-	}
-	if meta, ok := cfg.Branches[branch]; ok {
+// ParentOf returns the parent from an already-loaded config.
+func (c *Config) ParentOf(branch string) string {
+	if meta, ok := c.Branches[branch]; ok {
 		return meta.Parent
 	}
 	return ""
 }
 
-// ParentHead returns the stored parent HEAD SHA, or empty string.
-func ParentHead(branch string) string {
-	cfg, err := Load()
-	if err != nil {
-		return ""
-	}
-	if meta, ok := cfg.Branches[branch]; ok {
+// ParentHeadOf returns the stored parent HEAD SHA from an already-loaded config.
+func (c *Config) ParentHeadOf(branch string) string {
+	if meta, ok := c.Branches[branch]; ok {
 		return meta.ParentHead
 	}
 	return ""
 }
 
-// Children returns all branches that have the given branch as their parent.
-func Children(branch string) []string {
-	cfg, err := Load()
-	if err != nil {
-		return nil
-	}
+// ChildrenOf returns all branches that have the given branch as their parent.
+func (c *Config) ChildrenOf(branch string) []string {
 	var result []string
-	for name, meta := range cfg.Branches {
+	for name, meta := range c.Branches {
 		if meta.Parent == branch {
 			result = append(result, name)
 		}
@@ -183,50 +177,36 @@ func Children(branch string) []string {
 	return result
 }
 
-// StackChain walks up from branch to root, returns [root, ..., branch].
-func StackChain(branch string) []string {
-	cfg, err := Load()
-	if err != nil {
-		return []string{branch}
-	}
-
+// StackChainOf walks up from branch to root, returns [root, ..., branch].
+func (c *Config) StackChainOf(branch string) []string {
 	chain := []string{branch}
 	visited := map[string]bool{branch: true}
 	current := branch
-
 	for {
-		meta, ok := cfg.Branches[current]
+		meta, ok := c.Branches[current]
 		if !ok {
 			break
 		}
 		if visited[meta.Parent] {
-			break // cycle guard
+			break
 		}
 		visited[meta.Parent] = true
 		chain = append(chain, meta.Parent)
 		current = meta.Parent
 	}
-
-	// Reverse
 	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
 		chain[i], chain[j] = chain[j], chain[i]
 	}
 	return chain
 }
 
-// Descendants walks down from branch, returns all descendants in order.
-func Descendants(branch string) []string {
-	if _, err := Load(); err != nil {
-		return nil
-	}
-
+// DescendantsOf walks down from branch, returns all descendants in order.
+func (c *Config) DescendantsOf(branch string) []string {
 	var result []string
 	visited := map[string]bool{branch: true}
-
 	var walk func(current string)
 	walk = func(current string) {
-		children := Children(current)
-		for _, child := range children {
+		for _, child := range c.ChildrenOf(current) {
 			if visited[child] {
 				continue
 			}
@@ -235,9 +215,53 @@ func Descendants(branch string) []string {
 			walk(child)
 		}
 	}
-
 	walk(branch)
 	return result
+}
+
+// Parent returns the parent branch name, or empty string.
+func Parent(branch string) string {
+	cfg, err := Load()
+	if err != nil {
+		return ""
+	}
+	return cfg.ParentOf(branch)
+}
+
+// ParentHead returns the stored parent HEAD SHA, or empty string.
+func ParentHead(branch string) string {
+	cfg, err := Load()
+	if err != nil {
+		return ""
+	}
+	return cfg.ParentHeadOf(branch)
+}
+
+// Children returns all branches that have the given branch as their parent.
+func Children(branch string) []string {
+	cfg, err := Load()
+	if err != nil {
+		return nil
+	}
+	return cfg.ChildrenOf(branch)
+}
+
+// StackChain walks up from branch to root, returns [root, ..., branch].
+func StackChain(branch string) []string {
+	cfg, err := Load()
+	if err != nil {
+		return []string{branch}
+	}
+	return cfg.StackChainOf(branch)
+}
+
+// Descendants walks down from branch, returns all descendants in order.
+func Descendants(branch string) []string {
+	cfg, err := Load()
+	if err != nil {
+		return nil
+	}
+	return cfg.DescendantsOf(branch)
 }
 
 // RemoveBranch removes a branch from config (as child and parent).

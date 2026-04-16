@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
@@ -32,11 +31,17 @@ func runSync(cmd *cobra.Command, args []string) error {
 	stackFlag, _ := cmd.Flags().GetBool("stack")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
+	cfg, err := stack.Load()
+	if err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
+
 	var chain []string
 	if stackFlag || len(args) == 0 {
-		chain = autoDetectChain()
+		chain = autoDetectChain(cfg)
 	} else {
-		chain = stack.TopoSort(args)
+		chain = stack.TopoSortWith(cfg, args)
 	}
 
 	if len(chain) < 2 {
@@ -76,7 +81,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// --update-refs only works on linear chains; validate that each branch
 	// in the chain is the parent of the next one.
-	if useUpdateRefs && !isLinearChain(chain) {
+	if useUpdateRefs && !isLinearChain(cfg, chain) {
 		ui.PrintInfo("Stack has siblings. Falling back to --onto iteration.")
 		useUpdateRefs = false
 	}
@@ -98,11 +103,14 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	if success {
-		// Update parent heads
+		// Update parent heads (batch: load once, update all, save once)
 		for i, branch := range syncBranches {
 			parentRef, _ := git.Run("rev-parse", chain[i])
-			stack.UpdateParentHead(branch, parentRef)
+			if meta, ok := cfg.Branches[branch]; ok {
+				meta.ParentHead = parentRef
+			}
 		}
+		cfg.Save()
 
 		// Push
 		fmt.Println()
@@ -134,10 +142,9 @@ func syncUpdateRefs(chain []string, root string) bool {
 		return false
 	}
 
-	c := exec.Command("git", "rebase", "--update-refs", root)
-	out, err := c.CombinedOutput()
+	_, err := git.RunCombined("rebase", "--update-refs", root)
 	if err != nil {
-		handleRebaseFailure(string(out), chain)
+		handleRebaseConflict(chain)
 		return false
 	}
 
@@ -161,17 +168,16 @@ func syncOnto(chain []string) bool {
 		parent := chain[i-1]
 		branch := chain[i]
 
-		var c *exec.Cmd
+		var err error
 		if i == 1 {
-			c = exec.Command("git", "rebase", parent, branch)
+			_, err = git.RunCombined("rebase", parent, branch)
 		} else {
 			newParentSHA, _ := git.Run("rev-parse", parent)
-			c = exec.Command("git", "rebase", "--onto", newParentSHA, preRebaseSHA[parent], branch)
+			_, err = git.RunCombined("rebase", "--onto", newParentSHA, preRebaseSHA[parent], branch)
 		}
 
-		out, err := c.CombinedOutput()
 		if err != nil {
-			handleRebaseFailure(string(out), chain[i:])
+			handleRebaseConflict(chain[i:])
 			return false
 		}
 		ui.PrintSuccess(fmt.Sprintf("Rebased %s", branch))
@@ -179,47 +185,21 @@ func syncOnto(chain []string) bool {
 	return true
 }
 
-func handleRebaseFailure(output string, remaining []string) {
-	ui.PrintError("Rebase conflict encountered")
-	fmt.Println()
-
-	conflicts := git.RunUnchecked("diff", "--name-only", "--diff-filter=U")
-	if conflicts != "" {
-		fmt.Println("  Conflicting files:")
-		for _, f := range strings.Split(conflicts, "\n") {
-			if f != "" {
-				fmt.Printf("    %s\n", f)
-			}
-		}
-		fmt.Println()
-	}
-
-	fmt.Println("  To resolve:")
-	fmt.Println("    1. Fix the conflicts in the listed files")
-	fmt.Println("    2. Run: git add . && git rebase --continue")
-	if len(remaining) > 1 {
-		fmt.Printf("    3. Run: gx sync %s\n", strings.Join(remaining, " "))
-		fmt.Println("       (to continue syncing the rest of the stack)")
-	}
-	fmt.Println()
-	fmt.Println("  Sync stopped. Downstream branches were not updated.")
-}
-
-func autoDetectChain() []string {
+func autoDetectChain(cfg *stack.Config) []string {
 	current, err := git.CurrentBranch()
 	if err != nil {
 		return nil
 	}
-	chainUp := stack.StackChain(current)
-	descendants := stack.Descendants(current)
+	chainUp := cfg.StackChainOf(current)
+	descendants := cfg.DescendantsOf(current)
 	return append(chainUp, descendants...)
 }
 
 // isLinearChain returns true if each branch in chain[1:] has exactly one child
 // (the next branch in the chain), meaning there are no siblings.
-func isLinearChain(chain []string) bool {
+func isLinearChain(cfg *stack.Config, chain []string) bool {
 	for i := 0; i < len(chain)-1; i++ {
-		children := stack.Children(chain[i])
+		children := cfg.ChildrenOf(chain[i])
 		if len(children) != 1 || children[0] != chain[i+1] {
 			return false
 		}

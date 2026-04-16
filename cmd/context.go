@@ -126,13 +126,13 @@ func runContext(cmd *cobra.Command, args []string) error {
 	// Active operations
 	root, _ := git.RepoRoot()
 	if root != "" {
-		if git.FileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
+		if git.FileExists(filepath.Join(root, ".git", git.MergeHeadPath)) {
 			fmt.Println()
 			ui.PrintWarning("Merge in progress")
-		} else if git.DirExists(filepath.Join(root, ".git", "rebase-merge")) || git.DirExists(filepath.Join(root, ".git", "rebase-apply")) {
+		} else if git.DirExists(filepath.Join(root, ".git", git.RebaseMergePath)) || git.DirExists(filepath.Join(root, ".git", git.RebaseApplyPath)) {
 			fmt.Println()
 			ui.PrintWarning("Rebase in progress")
-		} else if git.FileExists(filepath.Join(root, ".git", "CHERRY_PICK_HEAD")) {
+		} else if git.FileExists(filepath.Join(root, ".git", git.CherryPickHeadPath)) {
 			fmt.Println()
 			ui.PrintWarning("Cherry-pick in progress")
 		}

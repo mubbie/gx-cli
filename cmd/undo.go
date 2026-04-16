@@ -53,12 +53,12 @@ func detectUndoState() *undoState {
 	}
 
 	// Priority 1: Merge conflict
-	if git.FileExists(filepath.Join(root, ".git", "MERGE_HEAD")) {
+	if git.FileExists(filepath.Join(root, ".git", git.MergeHeadPath)) {
 		return &undoState{undoMergeConflict, "merge conflict in progress", "git merge --abort", "Abort the merge. Returns to pre-merge state."}
 	}
 
 	// Priority 2: Rebase
-	if git.DirExists(filepath.Join(root, ".git", "rebase-merge")) || git.DirExists(filepath.Join(root, ".git", "rebase-apply")) {
+	if git.DirExists(filepath.Join(root, ".git", git.RebaseMergePath)) || git.DirExists(filepath.Join(root, ".git", git.RebaseApplyPath)) {
 		return &undoState{undoRebase, "rebase in progress", "git rebase --abort", "Abort the rebase. Returns to pre-rebase state."}
 	}
 
@@ -279,12 +279,21 @@ func saveUndoEntries(entries []undoEntry) {
 	if path == "" {
 		return
 	}
-	os.MkdirAll(filepath.Dir(path), 0o755)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
 	if len(entries) > 50 {
 		entries = entries[len(entries)-50:]
 	}
-	data, _ := json.MarshalIndent(map[string]any{"entries": entries}, "", "  ")
-	os.WriteFile(path, data, 0o644)
+	data, err := json.MarshalIndent(map[string]any{"entries": entries}, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return
+	}
+	os.Rename(tmp, path)
 }
 
 func saveUndoHistory(action, desc, command, preRef, postRef string) {

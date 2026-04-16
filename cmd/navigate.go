@@ -21,7 +21,12 @@ func runUp(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return nil
 	}
-	children := stack.Children(current)
+	cfg, err := stack.Load()
+	if err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
+	children := cfg.ChildrenOf(current)
 	if len(children) == 0 {
 		ui.PrintInfo("Already at the top of the stack.")
 		return nil
@@ -47,7 +52,12 @@ func runDown(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return nil
 	}
-	parent := stack.Parent(current)
+	cfg, err := stack.Load()
+	if err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
+	parent := cfg.ParentOf(current)
 	if parent == "" {
 		ui.PrintInfo(fmt.Sprintf("%s is not in the stack. Use `gx switch` to navigate.", current))
 		return nil
@@ -69,11 +79,16 @@ func runTop(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return nil
 	}
+	cfg, err := stack.Load()
+	if err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
 
 	target := current
 	visited := map[string]bool{current: true}
 	for {
-		children := stack.Children(target)
+		children := cfg.ChildrenOf(target)
 		if len(children) == 0 {
 			break
 		}
@@ -107,13 +122,18 @@ func runBottom(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return nil
 	}
+	cfg, err := stack.Load()
+	if err != nil {
+		ui.PrintError(err.Error())
+		return nil
+	}
 
 	head := git.HeadBranch()
-	parent := stack.Parent(current)
+	parent := cfg.ParentOf(current)
 
 	// On trunk or not in stack: enter the stack
 	if current == head || parent == "" {
-		children := stack.Children(current)
+		children := cfg.ChildrenOf(current)
 		if len(children) == 0 {
 			ui.PrintInfo("No stack branches found.")
 			return nil
@@ -138,7 +158,7 @@ func runBottom(cmd *cobra.Command, args []string) error {
 	target := current
 	visited := map[string]bool{current: true}
 	for {
-		p := stack.Parent(target)
+		p := cfg.ParentOf(target)
 		if p == "" || p == head {
 			break
 		}
@@ -147,7 +167,7 @@ func runBottom(cmd *cobra.Command, args []string) error {
 			break
 		}
 		visited[p] = true
-		if stack.Parent(p) == "" || stack.Parent(p) == head {
+		if cfg.ParentOf(p) == "" || cfg.ParentOf(p) == head {
 			target = p
 			break
 		}

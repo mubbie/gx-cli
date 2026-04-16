@@ -2,13 +2,9 @@ package stack
 
 import "sort"
 
-// TopoSort sorts branches so parents always come before children.
-func TopoSort(branches []string) []string {
-	cfg, err := Load()
-	if err != nil {
-		return branches
-	}
-
+// TopoSortWith sorts branches so parents always come before children,
+// using an already-loaded config to avoid redundant Load calls.
+func TopoSortWith(cfg *Config, branches []string) []string {
 	branchSet := make(map[string]bool)
 	for _, b := range branches {
 		branchSet[b] = true
@@ -69,4 +65,13 @@ func TopoSort(branches []string) []string {
 	}
 
 	return result
+}
+
+// TopoSort sorts branches so parents always come before children.
+func TopoSort(branches []string) []string {
+	cfg, err := Load()
+	if err != nil {
+		return branches
+	}
+	return TopoSortWith(cfg, branches)
 }

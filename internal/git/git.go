@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+// Git state file paths (relative to .git/).
+const (
+	MergeHeadPath      = "MERGE_HEAD"
+	RebaseMergePath    = "rebase-merge"
+	RebaseApplyPath    = "rebase-apply"
+	CherryPickHeadPath = "CHERRY_PICK_HEAD"
+)
+
 // Error is returned when a git command fails.
 type Error struct {
 	Args   []string
@@ -36,6 +44,18 @@ func Run(args ...string) (string, error) {
 		return "", &Error{Args: args, Stderr: strings.TrimSpace(stderr.String()), Err: err}
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// RunCombined executes a git command and returns combined stdout+stderr.
+// Used for rebase operations that need to capture conflict output.
+func RunCombined(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	out, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(out))
+	if err != nil {
+		return output, &Error{Args: args, Stderr: output, Err: err}
+	}
+	return output, nil
 }
 
 // RunUnchecked executes a git command and returns stdout even on failure.

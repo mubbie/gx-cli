@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
 	"github.com/mubbie/gx-cli/internal/stack"
@@ -117,24 +116,9 @@ func runRetarget(cmd *cobra.Command, args []string) error {
 
 	// Rebase
 	fmt.Printf("  Rebasing %s onto %s (using --onto)...\n", branch, remoteTarget)
-	c := exec.Command("git", "rebase", "--onto", remoteTarget, oldParentRef, branch)
-	_, err := c.CombinedOutput()
+	_, err := git.RunCombined("rebase", "--onto", remoteTarget, oldParentRef, branch)
 	if err != nil {
-		ui.PrintError("Rebase conflict encountered")
-		fmt.Println()
-		conflicts := git.RunUnchecked("diff", "--name-only", "--diff-filter=U")
-		if conflicts != "" {
-			fmt.Println("  Conflicting files:")
-			for _, f := range strings.Split(conflicts, "\n") {
-				if f != "" {
-					fmt.Printf("    %s\n", f)
-				}
-			}
-			fmt.Println()
-		}
-		fmt.Println("  To resolve:")
-		fmt.Println("    1. Fix the conflicts")
-		fmt.Println("    2. Run: git add . && git rebase --continue")
+		handleRebaseConflict([]string{branch})
 		fmt.Printf("    3. Run: gx retarget %s %s\n", branch, newTarget)
 		return nil
 	}

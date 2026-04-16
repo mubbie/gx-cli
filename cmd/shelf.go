@@ -86,8 +86,12 @@ func getStashList() []stashEntry {
 		}
 
 		// Get file stats (shortstat is one line: " 3 files changed, 12 insertions(+), 5 deletions(-)")
+		// Cap stats fetching to avoid N+1 for large stash counts
 		numFiles, adds, dels := 0, 0, 0
-		statLine := git.RunUnchecked("stash", "show", "--shortstat", parts[0])
+		statLine := ""
+		if len(entries) < 20 {
+			statLine = git.RunUnchecked("stash", "show", "--shortstat", parts[0])
+		}
 		if statLine != "" {
 			fmt.Sscanf(strings.TrimSpace(statLine), "%d", &numFiles)
 			if i := strings.Index(statLine, "insertion"); i > 0 {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"sort"
 	"strings"
 
 	"github.com/mubbie/gx-cli/internal/git"
@@ -62,8 +61,8 @@ func runView(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get full chain
-	chain := stack.StackChain(current)
-	descendants := stack.Descendants(current)
+	chain := cfg.StackChainOf(current)
+	descendants := cfg.DescendantsOf(current)
 
 	var allBranches []string
 	seen := map[string]bool{}
@@ -132,13 +131,7 @@ func showTrunkView(cfg *stack.Config, trunk string) {
 	fmt.Printf("You're on %s %s\n\n", ui.BranchStyle.Render(trunk), ui.DimStyle.Render("(trunk)"))
 
 	// Find direct children
-	var children []string
-	for name, meta := range cfg.Branches {
-		if meta.Parent == trunk {
-			children = append(children, name)
-		}
-	}
-	sort.Strings(children)
+	children := cfg.ChildrenOf(trunk)
 
 	if len(children) == 0 {
 		fmt.Println("  No stacked branches yet. Use `gx stack` to start.")
@@ -152,7 +145,7 @@ func showTrunkView(cfg *stack.Config, trunk string) {
 		cur := child
 		visited := map[string]bool{child: true}
 		for {
-			kids := stack.Children(cur)
+			kids := cfg.ChildrenOf(cur)
 			if len(kids) == 0 {
 				break
 			}
