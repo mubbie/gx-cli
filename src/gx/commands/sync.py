@@ -21,6 +21,7 @@ from gx.utils.git import (
     GitError,
     ensure_git_repo,
     get_current_branch,
+    is_clean_working_tree,
     run_git,
     supports_update_refs,
 )
@@ -229,6 +230,11 @@ def sync(
         )
         print_dry_run(actions)
         return
+
+    # Check for uncommitted changes
+    if not is_clean_working_tree():
+        print_warning("You have uncommitted changes. Stash or commit them before syncing.")
+        raise typer.Exit(1)
 
     # Confirm for long chains
     if len(sync_branches) >= SYNC_CONFIRM_THRESHOLD:

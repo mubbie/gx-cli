@@ -19,6 +19,7 @@ from gx.utils.display import (
     print_info,
     print_success,
     print_table,
+    print_warning,
 )
 from gx.utils.git import (
     GitError,
@@ -26,6 +27,7 @@ from gx.utils.git import (
     get_last_commit,
     get_reflog_entries,
     get_repo_root,
+    is_clean_working_tree,
     run_git,
     time_ago,
 )
@@ -161,7 +163,7 @@ def _detect_state() -> dict | None:
                 "action_msg": "Soft reset to previous commit. Your changes will be preserved in staging.",
             }
 
-        break  # Only inspect the most recent meaningful action
+        continue  # Skip non-matching entries and check subsequent ones
 
     return None
 
@@ -293,6 +295,13 @@ def redo() -> None:
     if not confirm_action("Proceed with redo?"):
         print_info("Cancelled.")
         raise typer.Exit(0)
+
+    # Check for uncommitted changes before hard reset
+    if not is_clean_working_tree():
+        print_warning("You have uncommitted changes that would be lost by redo.")
+        if not confirm_action("Proceed anyway?"):
+            print_info("Cancelled.")
+            raise typer.Exit(0)
 
     # Redo by resetting to pre-state
     pre_ref = last_undo.get("pre_state_ref", "")

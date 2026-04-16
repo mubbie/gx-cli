@@ -22,6 +22,7 @@ from gx.utils.git import (
     branch_exists,
     ensure_git_repo,
     get_current_branch,
+    is_clean_working_tree,
     run_git,
 )
 from gx.utils.stack import get_parent, get_parent_head, record_relationship
@@ -101,6 +102,10 @@ def retarget(
             "  5. Attempt PR retarget via gh CLI",
         ])
         return
+
+    if not is_clean_working_tree():
+        print_warning("You have uncommitted changes. Stash or commit them before retargeting.")
+        raise typer.Exit(1)
 
     if not confirm_action(f"Retarget {branch} onto {new_target}?"):
         print_info("Cancelled.")
