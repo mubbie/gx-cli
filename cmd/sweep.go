@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -88,41 +89,46 @@ func runSweep(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	sp.Stop()
-	fmt.Println()
-
 	if len(merged) == 0 && len(squashMerged) == 0 && len(staleRefs) == 0 {
+		sp.Stop()
+		fmt.Println()
 		ui.PrintSuccess("Nothing to clean up. Repository is tidy!")
 		return nil
 	}
 
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf)
+
 	if len(merged) > 0 {
-		fmt.Println(ui.BoldStyle.Render("Merged branches (safe to delete):"))
+		fmt.Fprintln(&buf, ui.BoldStyle.Render("Merged branches (safe to delete):"))
 		for _, b := range merged {
-			fmt.Printf("  %s\n", ui.BranchStyle.Render(b))
+			fmt.Fprintf(&buf, "  %s\n", ui.BranchStyle.Render(b))
 		}
-		fmt.Println()
+		fmt.Fprintln(&buf)
 	}
 	if len(squashMerged) > 0 {
-		fmt.Println(ui.BoldStyle.Render("Likely squash-merged branches:"))
+		fmt.Fprintln(&buf, ui.BoldStyle.Render("Likely squash-merged branches:"))
 		for _, b := range squashMerged {
-			fmt.Printf("  %s\n", ui.BranchStyle.Render(b))
+			fmt.Fprintf(&buf, "  %s\n", ui.BranchStyle.Render(b))
 		}
-		fmt.Println()
+		fmt.Fprintln(&buf)
 	}
 	if len(staleRefs) > 0 {
-		fmt.Println(ui.BoldStyle.Render("Stale remote tracking refs:"))
+		fmt.Fprintln(&buf, ui.BoldStyle.Render("Stale remote tracking refs:"))
 		for _, r := range staleRefs {
-			fmt.Printf("  %s\n", ui.DimStyle.Render(r))
+			fmt.Fprintf(&buf, "  %s\n", ui.DimStyle.Render(r))
 		}
-		fmt.Println()
+		fmt.Fprintln(&buf)
 	}
 
-	fmt.Printf("%s %s merged, %s likely squash-merged, %s stale refs\n\n",
+	fmt.Fprintf(&buf, "%s %s merged, %s likely squash-merged, %s stale refs\n\n",
 		ui.BoldStyle.Render("Summary:"),
 		ui.BoldStyle.Render(fmt.Sprintf("%d", len(merged))),
 		ui.BoldStyle.Render(fmt.Sprintf("%d", len(squashMerged))),
 		ui.BoldStyle.Render(fmt.Sprintf("%d", len(staleRefs))))
+
+	sp.Stop()
+	fmt.Print(buf.String())
 
 	if dryRun {
 		fmt.Printf("%s would delete %d branches, %d stale refs\n", ui.WarningStyle.Render("DRY RUN"), len(merged)+len(squashMerged), len(staleRefs))

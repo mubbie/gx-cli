@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -105,9 +106,10 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	sp.Stop()
+	var buf bytes.Buffer
 
 	if len(conflicts) == 0 {
+		sp.Stop()
 		ui.PrintSuccess("No conflicts. Clean merge.")
 		if mb != "" {
 			stat := git.RunUnchecked("diff", "--stat", mb+".."+target)
@@ -121,7 +123,7 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("%s %d conflict%s found\n\n", ui.ErrorStyle.Render("X"), len(conflicts), ui.Plural(len(conflicts)))
+	fmt.Fprintf(&buf, "%s %d conflict%s found\n\n", ui.ErrorStyle.Render("X"), len(conflicts), ui.Plural(len(conflicts)))
 	for _, f := range conflicts {
 		// Try to get authors
 		ourAuthor := git.RunUnchecked("log", "-1", "--format=%an", "--", f)
@@ -130,11 +132,14 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 		if ourAuthor != "" && theirAuthor != "" && ourAuthor != theirAuthor {
 			authors = fmt.Sprintf("     (%s + %s)", ourAuthor, theirAuthor)
 		}
-		fmt.Printf("  %s%s\n", f, authors)
+		fmt.Fprintf(&buf, "  %s%s\n", f, authors)
 	}
 
 	if cleanFiles > 0 {
-		fmt.Printf("\n  %d other file%s merge cleanly\n", cleanFiles, ui.Plural(cleanFiles))
+		fmt.Fprintf(&buf, "\n  %d other file%s merge cleanly\n", cleanFiles, ui.Plural(cleanFiles))
 	}
+
+	sp.Stop()
+	fmt.Print(buf.String())
 	return nil
 }

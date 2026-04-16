@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/mubbie/gx-cli/internal/git"
@@ -25,37 +26,42 @@ func runGraph(cmd *cobra.Command, args []string) error {
 
 	sp := ui.StartSpinner("Building branch tree...")
 	tree := stack.BuildTree()
-	sp.Stop()
+
 	if len(tree.Roots) == 0 && len(tree.Orphans) == 0 {
+		sp.Stop()
 		fmt.Println("No branches found.")
 		return nil
 	}
 
-	fmt.Println()
-	fmt.Println(ui.BoldStyle.Render("Branch Stack:"))
-	fmt.Println()
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf)
+	fmt.Fprintln(&buf, ui.BoldStyle.Render("Branch Stack:"))
+	fmt.Fprintln(&buf)
 
 	for i, root := range tree.Roots {
 		isLast := i == len(tree.Roots)-1 && len(tree.Orphans) == 0
-		renderNode(root, "", isLast)
+		renderNodeTo(&buf, root, "", isLast)
 	}
 
 	if len(tree.Orphans) > 0 {
-		fmt.Println()
-		fmt.Println(ui.WarningStyle.Bold(true).Render("Orphaned Branches:"))
+		fmt.Fprintln(&buf)
+		fmt.Fprintln(&buf, ui.WarningStyle.Bold(true).Render("Orphaned Branches:"))
 		for i, orphan := range tree.Orphans {
-			renderNode(orphan, "", i == len(tree.Orphans)-1)
+			renderNodeTo(&buf, orphan, "", i == len(tree.Orphans)-1)
 		}
 	}
 
-	fmt.Println()
-	fmt.Println(ui.DimStyle.Render("Legend: * current branch  + merged  (+ahead/-behind)  ! orphaned"))
-	fmt.Println(ui.DimStyle.Render("Relationships stored in .git/gx/stack.json"))
-	fmt.Println()
+	fmt.Fprintln(&buf)
+	fmt.Fprintln(&buf, ui.DimStyle.Render("Legend: * current branch  + merged  (+ahead/-behind)  ! orphaned"))
+	fmt.Fprintln(&buf, ui.DimStyle.Render("Relationships stored in .git/gx/stack.json"))
+	fmt.Fprintln(&buf)
+
+	sp.Stop()
+	fmt.Print(buf.String())
 	return nil
 }
 
-func renderNode(node *stack.BranchNode, prefix string, isLast bool) {
+func renderNodeTo(buf *bytes.Buffer, node *stack.BranchNode, prefix string, isLast bool) {
 	connector := ui.DimStyle.Render("|-- ")
 	if isLast {
 		connector = ui.DimStyle.Render("`-- ")
@@ -87,13 +93,13 @@ func renderNode(node *stack.BranchNode, prefix string, isLast bool) {
 		name = ui.BranchStyle.Render(node.Name)
 	}
 
-	fmt.Printf("%s%s%s%s\n", prefix, connector, name, indicators)
+	fmt.Fprintf(buf, "%s%s%s%s\n", prefix, connector, name, indicators)
 
 	childPrefix := prefix + ui.DimStyle.Render("|") + "   "
 	if isLast {
 		childPrefix = prefix + "    "
 	}
 	for i, child := range node.Children {
-		renderNode(child, childPrefix, i == len(node.Children)-1)
+		renderNodeTo(buf, child, childPrefix, i == len(node.Children)-1)
 	}
 }

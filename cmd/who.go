@@ -49,7 +49,7 @@ func runWho(cmd *cobra.Command, args []string) error {
 }
 
 func whoRepo(n int, since string) error {
-	sp := ui.StartSpinner("Analyzing contributors...")
+	sp := ui.StartSpinner("Analyzing contributors (this may take a moment)...")
 
 	// Get commit counts + emails
 	shortlogArgs := []string{"shortlog", "-sne", "--all"}

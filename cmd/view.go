@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -81,14 +82,15 @@ func runView(cmd *cobra.Command, args []string) error {
 
 	hasGH := isGHAvailable()
 	var prMap map[string]prInfo
+	var sp *ui.Spinner
 	if hasGH {
-		sp := ui.StartSpinner("Fetching PR status...")
+		sp = ui.StartSpinner("Fetching PR status...")
 		prMap = fetchPRMap()
-		sp.Stop()
 	}
 
-	fmt.Println()
-	fmt.Println(ui.BranchStyle.Render(trunk))
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf)
+	fmt.Fprintln(&buf, ui.BranchStyle.Render(trunk))
 	for _, branch := range allBranches {
 		meta := cfg.Branches[branch]
 		parent := trunk
@@ -114,9 +116,14 @@ func runView(cmd *cobra.Command, args []string) error {
 		if branch == current {
 			parts = append(parts, "  "+ui.HeadMarker.Render("<"))
 		}
-		fmt.Println(strings.Join(parts, ""))
+		fmt.Fprintln(&buf, strings.Join(parts, ""))
 	}
-	fmt.Println()
+	fmt.Fprintln(&buf)
+
+	if sp != nil {
+		sp.Stop()
+	}
+	fmt.Print(buf.String())
 	return nil
 }
 
