@@ -33,8 +33,7 @@ func runSweep(cmd *cobra.Command, args []string) error {
 	current, _ := git.CurrentBranch()
 
 	fmt.Println()
-	fmt.Println(ui.BoldStyle.Render("Scanning for cleanup opportunities..."))
-	fmt.Println()
+	sp := ui.StartSpinner("Scanning for cleanup opportunities...")
 
 	// Merged branches
 	mergedOut := git.RunUnchecked("branch", "--merged", head)
@@ -88,6 +87,9 @@ func runSweep(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+
+	sp.Stop()
+	fmt.Println()
 
 	if len(merged) == 0 && len(squashMerged) == 0 && len(staleRefs) == 0 {
 		ui.PrintSuccess("Nothing to clean up. Repository is tidy!")

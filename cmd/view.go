@@ -82,7 +82,9 @@ func runView(cmd *cobra.Command, args []string) error {
 	hasGH := isGHAvailable()
 	var prMap map[string]prInfo
 	if hasGH {
+		sp := ui.StartSpinner("Fetching PR status...")
 		prMap = fetchPRMap()
+		sp.Stop()
 	}
 
 	fmt.Println()

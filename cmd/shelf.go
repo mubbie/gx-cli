@@ -128,7 +128,9 @@ func runShelfInteractive(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	sp := ui.StartSpinner("Loading stashes...")
 	stashes := getStashList()
+	sp.Stop()
 	if len(stashes) == 0 {
 		ui.PrintInfo("No stashes. Use `gx shelf push` to stash your work.")
 		return nil

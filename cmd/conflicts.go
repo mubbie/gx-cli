@@ -53,6 +53,8 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("Checking %s against %s...\n\n", ui.BoldStyle.Render(current), ui.BoldStyle.Render(target))
 
+	sp := ui.StartSpinner("Checking for conflicts...")
+
 	// Try new-style merge-tree (Git >= 2.38), fall back to old 3-arg form
 	out, err := git.Run("merge-tree", "--write-tree", "HEAD", target)
 	if err != nil {
@@ -102,6 +104,8 @@ func runConflicts(cmd *cobra.Command, args []string) error {
 			cleanFiles = 0
 		}
 	}
+
+	sp.Stop()
 
 	if len(conflicts) == 0 {
 		ui.PrintSuccess("No conflicts. Clean merge.")

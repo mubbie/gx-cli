@@ -23,7 +23,9 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	sp := ui.StartSpinner("Building branch tree...")
 	tree := stack.BuildTree()
+	sp.Stop()
 	if len(tree.Roots) == 0 && len(tree.Orphans) == 0 {
 		fmt.Println("No branches found.")
 		return nil

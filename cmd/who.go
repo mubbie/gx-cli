@@ -46,11 +46,13 @@ func runWho(cmd *cobra.Command, args []string) error {
 }
 
 func whoRepo(n int, since string) error {
+	sp := ui.StartSpinner("Analyzing contributors...")
 	gitArgs := []string{"shortlog", "-sne", "--all"}
 	if since != "" {
 		gitArgs = append(gitArgs, "--since="+since)
 	}
 	out, err := git.Run(gitArgs...)
+	sp.Stop()
 	if err != nil || out == "" {
 		ui.PrintInfo("No contributors found.")
 		return nil

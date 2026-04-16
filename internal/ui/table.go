@@ -2,38 +2,30 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("4")).Padding(0, 1)
-	cellStyle   = lipgloss.NewStyle().Padding(0, 1)
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).MarginBottom(1)
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).MarginBottom(1)
 )
 
 const maxColWidth = 50
-
-// visibleWidth returns the printed width of a string, ignoring ANSI codes.
-func visibleWidth(s string) int {
-	return lipgloss.Width(s)
-}
-
 
 func PrintTable(headers []string, rows [][]string, title string) {
 	if title != "" {
 		fmt.Println(titleStyle.Render(title))
 	}
 
-	// Calculate column widths based on VISIBLE width (ignoring ANSI)
+	// Calculate column widths based on content
 	widths := make([]int, len(headers))
 	for i, h := range headers {
-		widths[i] = len(h) + 2
+		widths[i] = lipgloss.Width(h) + 2
 	}
 	for _, row := range rows {
 		for i, cell := range row {
-			w := visibleWidth(cell) + 2
+			w := lipgloss.Width(cell) + 2
 			if i < len(widths) && w > widths[i] {
 				widths[i] = w
 			}
@@ -48,32 +40,42 @@ func PrintTable(headers []string, rows [][]string, title string) {
 		}
 	}
 
-	// Header row
-	headerCells := make([]string, len(headers))
+	// Build columns
+	cols := make([]table.Column, len(headers))
 	for i, h := range headers {
-		headerCells[i] = headerStyle.Width(widths[i]).Render(h)
+		cols[i] = table.Column{Title: h, Width: widths[i]}
 	}
-	fmt.Println(strings.Join(headerCells, ""))
 
-	// Separator
-	sepParts := make([]string, len(headers))
-	for i := range headers {
-		sepParts[i] = DimStyle.Render(strings.Repeat("─", widths[i]))
-	}
-	fmt.Println(strings.Join(sepParts, ""))
-
-	// Rows: use lipgloss.Width-aware rendering
-	for _, row := range rows {
-		cells := make([]string, len(headers))
-		for i := range headers {
-			cell := ""
-			if i < len(row) {
-				cell = row[i]
+	// Build rows
+	tableRows := make([]table.Row, len(rows))
+	for i, row := range rows {
+		r := make(table.Row, len(headers))
+		for j := range headers {
+			if j < len(row) {
+				r[j] = row[j]
 			}
-			// Use lipgloss to handle width with ANSI-aware padding
-			cells[i] = cellStyle.Width(widths[i]).MaxWidth(widths[i]).Render(cell)
 		}
-		fmt.Println(strings.Join(cells, ""))
+		tableRows[i] = r
 	}
+
+	// Style the table
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		Bold(true).
+		Foreground(lipgloss.Color("4")).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("240"))
+	s.Selected = lipgloss.NewStyle() // Disable selection highlighting for static display
+	s.Cell = s.Cell.Padding(0, 1)
+
+	t := table.New(
+		table.WithColumns(cols),
+		table.WithRows(tableRows),
+		table.WithHeight(len(tableRows)+1),
+		table.WithStyles(s),
+	)
+
+	fmt.Println(t.View())
 	fmt.Println()
 }
