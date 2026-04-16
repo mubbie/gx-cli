@@ -34,7 +34,9 @@ func setupTestRepo(t *testing.T) string {
 	run("config", "user.name", "Test User")
 	run("config", "user.email", "test@example.com")
 	readme := filepath.Join(dir, "README.md")
-	os.WriteFile(readme, []byte("# Test\n"), 0644)
+	if err := os.WriteFile(readme, []byte("# Test\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 	run("add", "README.md")
 	run("commit", "-m", "Initial commit")
 	return dir
@@ -85,7 +87,9 @@ func TestIsClean(t *testing.T) {
 	if !IsClean() {
 		t.Error("fresh repo should be clean")
 	}
-	os.WriteFile(filepath.Join(dir, "dirty.txt"), []byte("dirty"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "dirty.txt"), []byte("dirty"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 	if IsClean() {
 		t.Error("repo with untracked file should not be clean")
 	}
@@ -112,7 +116,7 @@ func TestRunError(t *testing.T) {
 	}
 	gitErr, ok := err.(*Error)
 	if !ok {
-		t.Error("expected *Error type")
+		t.Fatalf("expected *Error type, got %T", err)
 	}
 	if gitErr.Stderr == "" {
 		t.Error("expected non-empty stderr")
@@ -160,7 +164,9 @@ func TestTimeAgo(t *testing.T) {
 func TestFileExistsDirExists(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "test.txt")
-	os.WriteFile(file, []byte("hi"), 0644)
+	if err := os.WriteFile(file, []byte("hi"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	if !FileExists(file) {
 		t.Error("file should exist")

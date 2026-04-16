@@ -21,6 +21,9 @@ func TestPluralES(t *testing.T) {
 	if PluralES(1) != "" {
 		t.Error("PluralES(1) should be empty")
 	}
+	if PluralES(0) != "es" {
+		t.Error("PluralES(0) should be 'es'")
+	}
 	if PluralES(2) != "es" {
 		t.Error("PluralES(2) should be 'es'")
 	}
@@ -29,6 +32,9 @@ func TestPluralES(t *testing.T) {
 func TestPluralIES(t *testing.T) {
 	if PluralIES(1) != "y" {
 		t.Error("PluralIES(1) should be 'y'")
+	}
+	if PluralIES(0) != "ies" {
+		t.Error("PluralIES(0) should be 'ies'")
 	}
 	if PluralIES(2) != "ies" {
 		t.Error("PluralIES(2) should be 'ies'")

@@ -28,6 +28,12 @@ func TestTopoSort(t *testing.T) {
 		return -1
 	}
 
+	for _, name := range []string{"main", "feature/a", "feature/b", "feature/c"} {
+		if indexOf(name) == -1 {
+			t.Fatalf("branch %q not found in result: %v", name, result)
+		}
+	}
+
 	if indexOf("main") > indexOf("feature/a") {
 		t.Error("main should come before feature/a")
 	}

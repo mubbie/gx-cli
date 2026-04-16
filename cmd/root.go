@@ -33,7 +33,7 @@ Stacking:
   stack, sync, retarget, graph, up, down, top, bottom, parent
 
 Utility:
-  nuke, update
+  nuke, update, completion
 
 Run gx <command> --help for details.
 `

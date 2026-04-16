@@ -34,7 +34,9 @@ func setupStackRepo(t *testing.T) string {
 	run("init", "-b", "main")
 	run("config", "user.name", "Test User")
 	run("config", "user.email", "test@example.com")
-	os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Test\n"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Test\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 	run("add", "README.md")
 	run("commit", "-m", "Initial commit")
 	return dir
@@ -43,9 +45,16 @@ func setupStackRepo(t *testing.T) string {
 func writeStackConfig(t *testing.T, dir string, config map[string]interface{}) {
 	t.Helper()
 	gxDir := filepath.Join(dir, ".git", "gx")
-	os.MkdirAll(gxDir, 0755)
-	data, _ := json.Marshal(config)
-	os.WriteFile(filepath.Join(gxDir, "stack.json"), data, 0644)
+	if err := os.MkdirAll(gxDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	data, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gxDir, "stack.json"), data, 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 }
 
 func TestLoadEmpty(t *testing.T) {
@@ -106,8 +115,12 @@ func TestRecordRelationship(t *testing.T) {
 	dir := setupStackRepo(t)
 	chdir(t, dir)
 	// Create the branch first
-	exec.Command("git", "-C", dir, "checkout", "-b", "feature/a").Run()
-	exec.Command("git", "-C", dir, "checkout", "main").Run()
+	if out, err := exec.Command("git", "-C", dir, "checkout", "-b", "feature/a").CombinedOutput(); err != nil {
+		t.Fatalf("git checkout -b feature/a failed: %s\n%s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", dir, "checkout", "main").CombinedOutput(); err != nil {
+		t.Fatalf("git checkout main failed: %s\n%s", err, out)
+	}
 
 	if err := RecordRelationship("feature/a", "main"); err != nil {
 		t.Fatalf("RecordRelationship failed: %v", err)
@@ -181,7 +194,9 @@ func TestConfigExists(t *testing.T) {
 		t.Error("config should not exist yet")
 	}
 	cfg := &Config{Branches: map[string]*BranchMeta{}, Meta: Metadata{MainBranch: "main"}}
-	cfg.Save()
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
 	if !ConfigExists() {
 		t.Error("config should exist after save")
 	}

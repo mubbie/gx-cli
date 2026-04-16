@@ -12,9 +12,15 @@ func TestResolveBranches(t *testing.T) {
 	chdir(t, dir)
 
 	// Create some branches
-	exec.Command("git", "-C", dir, "checkout", "-b", "feature/auth").Run()
-	exec.Command("git", "-C", dir, "checkout", "-b", "feature/search").Run()
-	exec.Command("git", "-C", dir, "checkout", "main").Run()
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %s\n%s", args, err, out)
+		}
+	}
+	run("checkout", "-b", "feature/auth")
+	run("checkout", "-b", "feature/search")
+	run("checkout", "main")
 
 	// Exact match
 	result := ResolveBranches("feature/auth")
@@ -43,10 +49,14 @@ func TestMergedBranches(t *testing.T) {
 	run := func(args ...string) {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = dir
-		cmd.Run()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %s\n%s", args, err, out)
+		}
 	}
 	run("checkout", "-b", "feature/done")
-	os.WriteFile(filepath.Join(dir, "done.txt"), []byte("done"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "done.txt"), []byte("done"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 	run("add", "done.txt")
 	run("commit", "-m", "done")
 	run("checkout", "main")
