@@ -119,10 +119,19 @@ def update_parent_head(child: str, new_parent_head: str) -> None:
         save_stack_config(config)
 
 
+def _get_branches(config: dict) -> dict:
+    """Get the branches dict from a loaded config."""
+    return dict(config.get("branches", {}))
+
+
 def get_parent(branch: str) -> str | None:
     """Return the parent branch name, or None."""
-    config = load_stack_config()
-    entry = config["branches"].get(branch)
+    return get_parent_config(load_stack_config(), branch)
+
+
+def get_parent_config(config: dict, branch: str) -> str | None:
+    """Return the parent branch name from a loaded config, or None."""
+    entry = _get_branches(config).get(branch)
     if entry is None:
         return None
     return str(entry["parent"])
@@ -130,8 +139,12 @@ def get_parent(branch: str) -> str | None:
 
 def get_parent_head(branch: str) -> str | None:
     """Return the stored parent_head SHA for a branch, or None."""
-    config = load_stack_config()
-    entry = config["branches"].get(branch)
+    return get_parent_head_config(load_stack_config(), branch)
+
+
+def get_parent_head_config(config: dict, branch: str) -> str | None:
+    """Return the stored parent_head SHA from a loaded config, or None."""
+    entry = _get_branches(config).get(branch)
     if entry is None:
         return None
     head = entry.get("parent_head", "")
@@ -140,9 +153,13 @@ def get_parent_head(branch: str) -> str | None:
 
 def get_children(branch: str) -> list[str]:
     """Return all branches that have this branch as their parent."""
-    config = load_stack_config()
+    return get_children_config(load_stack_config(), branch)
+
+
+def get_children_config(config: dict, branch: str) -> list[str]:
+    """Return all branches that have this branch as their parent, from a loaded config."""
     return [
-        child for child, meta in config["branches"].items()
+        child for child, meta in _get_branches(config).items()
         if meta.get("parent") == branch
     ]
 

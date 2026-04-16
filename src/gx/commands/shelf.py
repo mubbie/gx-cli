@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -26,6 +27,169 @@ shelf_app = typer.Typer(
 )
 
 
+@dataclass
+class StashEntry:
+    index: int
+    stash_id: str
+    hash: str
+    relative_time: str
+    message: str
+    branch: str
+    file_stats: str
+
+
+def _get_stash_list() -> list[StashEntry]:
+    """Parse git stash list into StashEntry objects."""
+    try:
+        output = run_git(["stash", "list", "--format=%gd|%H|%ar|%s"])
+    except GitError:
+        return []
+    if not output:
+        return []
+
+    entries: list[StashEntry] = []
+    for line in output.strip().splitlines():
+        parts = line.split("|", 3)
+        if len(parts) < 4:
+            continue
+        stash_id = parts[0]
+        try:
+            index = int(stash_id.split("{")[1].rstrip("}"))
+        except (ValueError, IndexError):
+            index = len(entries)
+        message = parts[3]
+        branch = _parse_branch(message)
+
+        # Get file stats for this stash
+        try:
+            stat_out = run_git(["stash", "show", "--stat", stash_id], check=False)
+            # Last line is like " 3 files changed, 10 insertions(+), 2 deletions(-)"
+            stat_lines = stat_out.strip().splitlines()
+            file_stats = stat_lines[-1].strip() if stat_lines else ""
+        except GitError:
+            file_stats = ""
+
+        entries.append(StashEntry(
+            index=index,
+            stash_id=stash_id,
+            hash=parts[1],
+            relative_time=parts[2],
+            message=message,
+            branch=branch,
+            file_stats=file_stats,
+        ))
+    return entries
+
+
+def _parse_branch(message: str) -> str:
+    """Extract branch name from stash message like 'On feature/auth: WIP'."""
+    if message.startswith("On "):
+        colon = message.find(":")
+        if colon > 3:
+            return message[3:colon]
+    if message.startswith("WIP on "):
+        colon = message.find(":")
+        if colon > 7:
+            return message[7:colon]
+    return ""
+
+
+def _display_stashes(stashes: list[StashEntry], filter_text: str = "") -> None:
+    """Print the stash list, optionally filtered."""
+    filtered = stashes
+    if filter_text:
+        lower = filter_text.lower()
+        filtered = [
+            s for s in stashes
+            if lower in s.message.lower() or lower in s.branch.lower()
+        ]
+
+    if not filtered:
+        if filter_text:
+            console.print(f"  No stashes matching '{filter_text}'")
+        else:
+            console.print("  No stashes.")
+        return
+
+    for s in filtered:
+        branch_str = f" [{s.branch}]" if s.branch else ""
+        stats_str = f"  ({s.file_stats})" if s.file_stats else ""
+        console.print(
+            f"  [bold]{s.index}[/bold]  {s.relative_time:<15} {s.message}{branch_str}{stats_str}"
+        )
+
+
+def _run_inline_picker(stashes: list[StashEntry]) -> None:
+    """Run the inline interactive stash picker.
+
+    Commands:
+        <n>a  - apply stash #n (keep it)
+        <n>p  - pop stash #n (apply + drop)
+        <n>d  - drop stash #n
+        text  - filter stashes by text
+        q     - quit
+    """
+    console.print()
+    _display_stashes(stashes)
+    console.print()
+    console.print("[dim]Commands: <n>a=apply  <n>p=pop  <n>d=drop  text=filter  q=quit[/dim]")
+
+    while True:
+        try:
+            choice = console.input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return
+
+        if not choice:
+            continue
+
+        if choice.lower() == "q":
+            return
+
+        # Check for action commands: <number><action>
+        if len(choice) >= 2 and choice[-1] in ("a", "p", "d", "A", "P", "D"):
+            num_part = choice[:-1]
+            action = choice[-1].lower()
+            try:
+                idx = int(num_part)
+            except ValueError:
+                # Not a number prefix, treat as filter text
+                _display_stashes(stashes, filter_text=choice)
+                continue
+
+            # Find matching stash
+            target = None
+            for s in stashes:
+                if s.index == idx:
+                    target = s
+                    break
+
+            if target is None:
+                print_error(f"No stash with index {idx}")
+                continue
+
+            if action == "a":
+                _do_apply(target.stash_id)
+                return
+            elif action == "p":
+                _do_pop(target.stash_id)
+                return
+            elif action == "d":
+                _do_drop(target.stash_id)
+                # Refresh list after drop and continue
+                stashes = _get_stash_list()
+                if not stashes:
+                    print_info("No more stashes.")
+                    return
+                console.print()
+                _display_stashes(stashes)
+                continue
+        else:
+            # Treat as filter text
+            _display_stashes(stashes, filter_text=choice)
+
+
 @shelf_app.callback(invoke_without_command=True)
 def shelf_default(ctx: typer.Context) -> None:
     """Visual stash manager. Browse, apply, and drop stashes interactively."""
@@ -38,30 +202,12 @@ def shelf_default(ctx: typer.Context) -> None:
         print_error(str(e))
         raise typer.Exit(1)
 
-    from gx.ui.shelf_app import get_stash_list, launch_shelf_browser
-
-    stashes = get_stash_list()
+    stashes = _get_stash_list()
     if not stashes:
         print_info("No stashes. Use `gx shelf push` to save work.")
         raise typer.Exit(0)
 
-    result = launch_shelf_browser()
-
-    if result is None:
-        return
-
-    # Process the action returned from the TUI
-    if ":" not in result:
-        return
-
-    action, stash_id = result.split(":", 1)
-
-    if action == "pop":
-        _do_pop(stash_id)
-    elif action == "apply":
-        _do_apply(stash_id)
-    elif action == "drop":
-        _do_drop(stash_id)
+    _run_inline_picker(stashes)
 
 
 def _do_pop(stash_id: str) -> None:
@@ -179,9 +325,7 @@ def list_stashes() -> None:
         print_error(str(e))
         raise typer.Exit(1)
 
-    from gx.ui.shelf_app import get_stash_list
-
-    stashes = get_stash_list()
+    stashes = _get_stash_list()
     if not stashes:
         print_info("No stashes.")
         return
@@ -209,9 +353,7 @@ def clear(
         print_error(str(e))
         raise typer.Exit(1)
 
-    from gx.ui.shelf_app import get_stash_list
-
-    stashes = get_stash_list()
+    stashes = _get_stash_list()
     if not stashes:
         print_info("No stashes to clear.")
         return

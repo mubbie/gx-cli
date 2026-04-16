@@ -13,7 +13,11 @@ from gx.utils.git import (
     is_clean_working_tree,
     run_git,
 )
-from gx.utils.stack import get_children, get_parent
+from gx.utils.stack import (
+    get_children_config,
+    get_parent_config,
+    load_stack_config,
+)
 
 
 def up() -> None:
@@ -30,7 +34,8 @@ def up() -> None:
         print_error(str(e))
         raise typer.Exit(1)
 
-    children = get_children(current)
+    config = load_stack_config()
+    children = get_children_config(config, current)
     if not children:
         print_info("Already at the top of the stack.")
         raise typer.Exit(0)
@@ -69,7 +74,8 @@ def down() -> None:
         print_error(str(e))
         raise typer.Exit(1)
 
-    parent = get_parent(current)
+    config = load_stack_config()
+    parent = get_parent_config(config, current)
     if parent is None:
         print_info(f"{current} is not in the stack. Use `gx switch` to navigate.")
         raise typer.Exit(0)
@@ -104,11 +110,12 @@ def top() -> None:
         print_error(str(e))
         raise typer.Exit(1)
 
+    config = load_stack_config()
     target = current
     visited: set[str] = {current}
 
     while True:
-        children = sorted(get_children(target))
+        children = sorted(get_children_config(config, target))
         if not children:
             break
         if len(children) > 1:
@@ -153,11 +160,12 @@ def bottom() -> None:
         raise typer.Exit(1)
 
     head_branch = get_head_branch()
+    config = load_stack_config()
 
     # If on trunk or not in stack, try to enter the stack
-    parent = get_parent(current)
+    parent = get_parent_config(config, current)
     if current == head_branch or parent is None:
-        children = sorted(get_children(current))
+        children = sorted(get_children_config(config, current))
         if not children:
             print_info("No stack branches found.")
             raise typer.Exit(0)
@@ -182,8 +190,8 @@ def bottom() -> None:
     visited: set[str] = {current}
 
     while True:
-        p = get_parent(target)
-        if p is None or p == head_branch or p not in visited and get_parent(p) is None:
+        p = get_parent_config(config, target)
+        if p is None or p == head_branch or p not in visited and get_parent_config(config, p) is None:
             break
         if p in visited:
             print_warning("Cycle detected in stack config.")
