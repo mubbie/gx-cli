@@ -55,7 +55,12 @@ func BuildTree() *BranchStack {
 	}
 
 	// Self-heal: detect parents for unknown branches
+	// Only check against trunk and existing stack parents (not all branches - avoids O(N^2))
 	changed := false
+	candidates := map[string]bool{mainBranch: true}
+	for _, meta := range cfg.Branches {
+		candidates[meta.Parent] = true
+	}
 	for branch := range branchSHAs {
 		if branch == mainBranch {
 			continue
@@ -65,7 +70,9 @@ func BuildTree() *BranchStack {
 				continue
 			}
 		}
-		if detected := detectParent(branch, branchSHAs); detected != "" {
+		// Only check against trunk and known parents, not all branches
+		detected := detectParentFast(branch, mainBranch, candidates, branchSHAs)
+		if detected != "" {
 			parentHead, _ := git.MergeBase(branch, detected)
 			cfg.Branches[branch] = &BranchMeta{Parent: detected, ParentHead: parentHead}
 			changed = true
@@ -91,19 +98,29 @@ func BuildTree() *BranchStack {
 		}
 	}
 
-	// Calculate ahead/behind
+	// Calculate ahead/behind and merged status
+	// Batch merged check: one call per unique parent instead of per child
+	mergedCache := map[string]map[string]bool{} // parent -> set of merged branches
 	for childName, meta := range cfg.Branches {
 		child, childOK := nodes[childName]
 		_, parentOK := nodes[meta.Parent]
 		if childOK && parentOK {
 			child.Ahead, child.Behind = git.AheadBehind(childName, meta.Parent)
 
-			merged := git.RunUnchecked("branch", "--merged", meta.Parent)
-			for _, line := range strings.Split(merged, "\n") {
-				if strings.TrimSpace(strings.TrimLeft(line, "* ")) == childName {
-					child.IsMerged = true
-					break
+			// Cache merged branches per parent
+			if _, ok := mergedCache[meta.Parent]; !ok {
+				mergedSet := map[string]bool{}
+				out := git.RunUnchecked("branch", "--merged", meta.Parent)
+				for _, line := range strings.Split(out, "\n") {
+					name := strings.TrimSpace(strings.TrimLeft(line, "* "))
+					if name != "" {
+						mergedSet[name] = true
+					}
 				}
+				mergedCache[meta.Parent] = mergedSet
+			}
+			if mergedCache[meta.Parent][childName] {
+				child.IsMerged = true
 			}
 		}
 	}
@@ -162,12 +179,22 @@ func BuildTree() *BranchStack {
 	}
 }
 
-func detectParent(branch string, branchSHAs map[string]string) string {
+// detectParentFast checks only trunk and known stack parents (not all branches).
+func detectParentFast(branch, mainBranch string, candidates map[string]bool, branchSHAs map[string]string) string {
+	// Try trunk first (most common case)
+	if _, exists := branchSHAs[mainBranch]; exists {
+		if mb, err := git.MergeBase(branch, mainBranch); err == nil && mb != "" {
+			return mainBranch
+		}
+	}
+	// Try other known parents
 	var bestParent string
-	bestDistance := int(^uint(0) >> 1) // max int
-
-	for candidate := range branchSHAs {
-		if candidate == branch {
+	bestDistance := int(^uint(0) >> 1)
+	for candidate := range candidates {
+		if candidate == branch || candidate == mainBranch {
+			continue
+		}
+		if _, exists := branchSHAs[candidate]; !exists {
 			continue
 		}
 		mb, err := git.MergeBase(branch, candidate)
@@ -186,5 +213,8 @@ func detectParent(branch string, branchSHAs map[string]string) string {
 			}
 		}
 	}
-	return bestParent
+	if bestParent != "" {
+		return bestParent
+	}
+	return mainBranch
 }

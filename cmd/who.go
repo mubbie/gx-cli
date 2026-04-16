@@ -25,11 +25,12 @@ func init() {
 }
 
 type contributor struct {
-	name    string
-	emails  map[string]bool
-	commits int
-	added   int
-	deleted int
+	name       string
+	emails     map[string]bool
+	commits    int
+	added      int
+	deleted    int
+	lastActive string // ISO date
 }
 
 func runWho(cmd *cobra.Command, args []string) error {
@@ -51,19 +52,25 @@ func runWho(cmd *cobra.Command, args []string) error {
 func whoRepo(n int, since string) error {
 	sp := ui.StartSpinner("Analyzing contributors (this may take a moment)...")
 
-	// Get commit counts + emails
+	// Run both git commands in parallel
 	shortlogArgs := []string{"shortlog", "-sne", "--all"}
 	if since != "" {
 		shortlogArgs = append(shortlogArgs, "--since="+since)
 	}
-	shortlogOut, err := git.Run(shortlogArgs...)
-
-	// Get line stats per author (added/deleted)
-	numstatArgs := []string{"log", "--all", "--numstat", "--format=%aE"}
+	shortstatArgs := []string{"log", "--all", "--shortstat", "--format=%aE|%aI"}
 	if since != "" {
-		numstatArgs = append(numstatArgs, "--since="+since)
+		shortstatArgs = append(shortstatArgs, "--since="+since)
 	}
-	numstatOut := git.RunUnchecked(numstatArgs...)
+
+	var shortlogOut, numstatOut string
+	var err error
+	done := make(chan struct{})
+	go func() {
+		shortlogOut, err = git.Run(shortlogArgs...)
+		close(done)
+	}()
+	numstatOut = git.RunUnchecked(shortstatArgs...)
+	<-done
 
 	// Parse shortlog
 	type rawEntry struct {
@@ -97,26 +104,44 @@ func whoRepo(n int, since string) error {
 		}
 	}
 
-	// Parse numstat to get lines per email
-	linesByEmail := map[string][2]int{} // email -> [added, deleted]
+	// Parse shortstat to get lines and last-active per email
+	linesByEmail := map[string][2]int{}    // email -> [added, deleted]
+	lastActiveByEmail := map[string]string{} // email -> ISO date (first seen = most recent)
 	if numstatOut != "" {
-		var currentEmail string
+		var currentEmail, currentDate string
 		for _, line := range strings.Split(numstatOut, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue
 			}
-			// Email lines from --format=%aE
-			if !strings.Contains(line, "\t") && strings.Contains(line, "@") {
-				currentEmail = strings.ToLower(line)
+			// Format lines: "email|date" from --format=%aE|%aI
+			if strings.Contains(line, "@") && strings.Contains(line, "|") {
+				parts := strings.SplitN(line, "|", 2)
+				currentEmail = strings.ToLower(parts[0])
+				if len(parts) > 1 {
+					currentDate = parts[1]
+				}
+				// Track first (most recent) date per email
+				if _, exists := lastActiveByEmail[currentEmail]; !exists {
+					lastActiveByEmail[currentEmail] = currentDate
+				}
 				continue
 			}
-			// Numstat lines: "added\tdeleted\tfile"
-			parts := strings.SplitN(line, "\t", 3)
-			if len(parts) >= 2 && currentEmail != "" {
+			// Shortstat lines
+			if strings.Contains(line, "file") && strings.Contains(line, "changed") && currentEmail != "" {
 				var a, d int
-				fmt.Sscanf(parts[0], "%d", &a)
-				fmt.Sscanf(parts[1], "%d", &d)
+				if idx := strings.Index(line, "insertion"); idx > 0 {
+					sub := strings.TrimSpace(line[:idx])
+					if ci := strings.LastIndex(sub, " "); ci >= 0 {
+						fmt.Sscanf(strings.TrimSpace(sub[ci+1:]), "%d", &a)
+					}
+				}
+				if idx := strings.Index(line, "deletion"); idx > 0 {
+					sub := strings.TrimSpace(line[:idx])
+					if ci := strings.LastIndex(sub, " "); ci >= 0 {
+						fmt.Sscanf(strings.TrimSpace(sub[ci+1:]), "%d", &d)
+					}
+				}
 				stats := linesByEmail[currentEmail]
 				stats[0] += a
 				stats[1] += d
@@ -192,11 +217,15 @@ func whoRepo(n int, since string) error {
 	}
 	for root, emails := range groupEmails {
 		groups[root].emails = emails
-		// Sum line stats across all emails in this group
 		for email := range emails {
 			if stats, ok := linesByEmail[email]; ok {
 				groups[root].added += stats[0]
 				groups[root].deleted += stats[1]
+			}
+			if date, ok := lastActiveByEmail[email]; ok {
+				if groups[root].lastActive == "" || date > groups[root].lastActive {
+					groups[root].lastActive = date
+				}
 			}
 		}
 	}
@@ -255,7 +284,10 @@ func whoRepo(n int, since string) error {
 		}
 		sort.Strings(emailList)
 
-		lastActive := getAuthorLastEdit(c.name, ".")
+		lastActive := "unknown"
+		if c.lastActive != "" {
+			lastActive = git.TimeAgo(c.lastActive)
+		}
 
 		// Lines and percentage
 		linesStr := ui.AddStyle.Render(fmt.Sprintf("+%d", c.added)) + " " + ui.DelStyle.Render(fmt.Sprintf("-%d", c.deleted))
@@ -290,10 +322,3 @@ func whoRepo(n int, since string) error {
 	return nil
 }
 
-func getAuthorLastEdit(author, path string) string {
-	out := git.RunUnchecked("log", "-1", "--author="+author, "--format=%aI", "--", path)
-	if out == "" {
-		return "unknown"
-	}
-	return git.TimeAgo(out)
-}
