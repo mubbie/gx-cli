@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -54,39 +53,42 @@ func BuildTree() *BranchStack {
 		}
 	}
 
-	// Self-heal: detect parents for unknown branches
-	// Only check against trunk and existing stack parents (not all branches - avoids O(N^2))
+	// Clean stale parent references (parent branch was deleted)
 	changed := false
-	candidates := map[string]bool{mainBranch: true}
-	for _, meta := range cfg.Branches {
-		candidates[meta.Parent] = true
-	}
-	for branch := range branchSHAs {
-		if branch == mainBranch {
-			continue
-		}
-		if meta, ok := cfg.Branches[branch]; ok {
-			if _, exists := branchSHAs[meta.Parent]; exists {
-				continue
+	for name, meta := range cfg.Branches {
+		if _, exists := branchSHAs[meta.Parent]; !exists {
+			// Parent no longer exists, default to trunk
+			if meta.Parent != mainBranch {
+				cfg.Branches[name] = &BranchMeta{Parent: mainBranch, ParentHead: meta.ParentHead}
+				changed = true
 			}
-		}
-		// Only check against trunk and known parents, not all branches
-		detected := detectParentFast(branch, mainBranch, candidates, branchSHAs)
-		if detected != "" {
-			parentHead, _ := git.MergeBase(branch, detected)
-			cfg.Branches[branch] = &BranchMeta{Parent: detected, ParentHead: parentHead}
-			changed = true
 		}
 	}
 	if changed {
 		_ = cfg.Save()
 	}
 
-	// Build nodes
+	// No self-healing: only show branches explicitly in stack.json.
+	// Use `gx stack` to add branches to the stack.
+
+	// Build nodes only for trunk + branches in the stack config
 	current, _ := git.CurrentBranch()
 	nodes := make(map[string]*BranchNode)
-	for name, sha := range branchSHAs {
-		nodes[name] = &BranchNode{Name: name, SHA: sha, IsHead: name == current}
+
+	// Always include trunk
+	if sha, exists := branchSHAs[mainBranch]; exists {
+		nodes[mainBranch] = &BranchNode{Name: mainBranch, SHA: sha, IsHead: mainBranch == current}
+	}
+	// Include all stacked branches and their parents
+	for name, meta := range cfg.Branches {
+		if sha, exists := branchSHAs[name]; exists {
+			nodes[name] = &BranchNode{Name: name, SHA: sha, IsHead: name == current}
+		}
+		if _, exists := nodes[meta.Parent]; !exists {
+			if sha, exists := branchSHAs[meta.Parent]; exists {
+				nodes[meta.Parent] = &BranchNode{Name: meta.Parent, SHA: sha, IsHead: meta.Parent == current}
+			}
+		}
 	}
 
 	// Wire parent-child links
@@ -179,42 +181,3 @@ func BuildTree() *BranchStack {
 	}
 }
 
-// detectParentFast checks only trunk and known stack parents (not all branches).
-func detectParentFast(branch, mainBranch string, candidates map[string]bool, branchSHAs map[string]string) string {
-	// Try trunk first (most common case)
-	if _, exists := branchSHAs[mainBranch]; exists {
-		if mb, err := git.MergeBase(branch, mainBranch); err == nil && mb != "" {
-			return mainBranch
-		}
-	}
-	// Try other known parents
-	var bestParent string
-	bestDistance := int(^uint(0) >> 1)
-	for candidate := range candidates {
-		if candidate == branch || candidate == mainBranch {
-			continue
-		}
-		if _, exists := branchSHAs[candidate]; !exists {
-			continue
-		}
-		mb, err := git.MergeBase(branch, candidate)
-		if err != nil || mb == "" {
-			continue
-		}
-		countStr, err := git.Run("rev-list", "--count", mb+".."+branch)
-		if err != nil {
-			continue
-		}
-		var distance int
-		if _, err := fmt.Sscanf(countStr, "%d", &distance); err == nil {
-			if distance < bestDistance {
-				bestDistance = distance
-				bestParent = candidate
-			}
-		}
-	}
-	if bestParent != "" {
-		return bestParent
-	}
-	return mainBranch
-}

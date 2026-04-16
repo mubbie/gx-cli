@@ -25,8 +25,11 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("git %s failed: %v", strings.Join(e.Args, " "), e.Err)
 }
 
+var gitCallCount int
+
 // Run executes a git command and returns trimmed stdout.
 func Run(args ...string) (string, error) {
+	gitCallCount++
 	cmd := exec.Command("git", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -37,6 +40,9 @@ func Run(args ...string) (string, error) {
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }
+
+// CallCount returns the number of git subprocess calls made.
+func CallCount() int { return gitCallCount }
 
 // RunDir executes a git command in a specific directory.
 func RunDir(dir string, args ...string) (string, error) {
