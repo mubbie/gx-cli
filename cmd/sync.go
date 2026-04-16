@@ -81,11 +81,19 @@ func runSync(cmd *cobra.Command, args []string) error {
 		useUpdateRefs = false
 	}
 
+	if !git.IsClean() {
+		ui.PrintWarning("You have uncommitted changes. Stash or commit them before syncing.")
+		return nil
+	}
+
 	var success bool
 	if useUpdateRefs {
 		success = syncUpdateRefs(chain, root)
 	} else {
-		ui.PrintInfo("Git < 2.38 detected. Using --onto fallback.")
+		if !git.SupportsUpdateRefs() {
+			ui.PrintInfo("Using --onto fallback (Git < 2.38).")
+		}
+		// else: already printed "Stack has siblings" message
 		success = syncOnto(chain)
 	}
 

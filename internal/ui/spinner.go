@@ -13,7 +13,6 @@ var spinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "�
 type Spinner struct {
 	stop    chan struct{}
 	done    sync.WaitGroup
-	showed  bool
 }
 
 // StartSpinner begins a spinner that appears after 200ms.
@@ -30,7 +29,6 @@ func StartSpinner(msg string) *Spinner {
 		case <-time.After(200 * time.Millisecond):
 		}
 
-		s.showed = true
 		i := 0
 		for {
 			select {

@@ -87,7 +87,7 @@ func detectUndoState() *undoState {
 			}
 			return &undoState{undoCommit, fmt.Sprintf("commit \"%s\" (%s, %s)", msg, short, git.TimeAgo(date)), "git reset --soft HEAD~1", "Soft reset to previous commit. Your changes will be preserved in staging."}
 		}
-		break
+		continue
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func runRedo(cmd *cobra.Command, args []string) error {
 	currentHead := git.RunUnchecked("rev-parse", "HEAD")
 	if last.PostRef != "" && currentHead != last.PostRef {
 		ui.PrintError("Cannot redo. Repo state has changed since last undo.")
-		fmt.Printf("  Expected HEAD at %s, but found %s.\n", last.PostRef[:7], currentHead[:7])
+		fmt.Printf("  Expected HEAD at %s, but found %s.\n", safeShort(last.PostRef, 7), safeShort(currentHead, 7))
 		ui.PrintInfo("Use `gx undo --history` to review past actions.")
 		return nil
 	}
@@ -208,10 +208,24 @@ func runRedo(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if !git.IsClean() {
+		ui.PrintWarning("You have uncommitted changes that would be lost by redo.")
+		if !ui.Confirm("Proceed anyway?") {
+			ui.PrintInfo("Cancelled.")
+			return nil
+		}
+	}
+
 	if last.Action == "stage" {
-		git.Run("add", "-A")
+		if _, err := git.Run("add", "-A"); err != nil {
+			ui.PrintError(fmt.Sprintf("Redo failed: %s", err))
+			return nil
+		}
 	} else {
-		git.Run("reset", "--hard", last.PreRef)
+		if _, err := git.Run("reset", "--hard", last.PreRef); err != nil {
+			ui.PrintError(fmt.Sprintf("Redo failed: %s", err))
+			return nil
+		}
 	}
 
 	last.Undone = true
@@ -284,6 +298,13 @@ func saveUndoHistory(action, desc, command, preRef, postRef string) {
 		PostRef:   postRef,
 	})
 	saveUndoEntries(entries)
+}
+
+func safeShort(s string, n int) string {
+	if len(s) < n {
+		return s
+	}
+	return s[:n]
 }
 
 func showUndoHistory() {

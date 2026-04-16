@@ -30,7 +30,10 @@ type BranchStack struct {
 // BuildTree constructs the full branch hierarchy with self-healing.
 func BuildTree() *BranchStack {
 	mainBranch := git.HeadBranch()
-	cfg, _ := Load()
+	cfg, err := Load()
+	if err != nil {
+		return &BranchStack{MainBranch: mainBranch, AllNodes: make(map[string]*BranchNode)}
+	}
 
 	// Get all local branches with SHAs
 	output := git.RunUnchecked("for-each-ref", "--format=%(refname:short)\t%(objectname)", "refs/heads/")

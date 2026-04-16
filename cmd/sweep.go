@@ -37,11 +37,10 @@ func runSweep(cmd *cobra.Command, args []string) error {
 	sp := ui.StartSpinner("Scanning for cleanup opportunities...")
 
 	// Merged branches
-	mergedOut := git.RunUnchecked("branch", "--merged", head)
+	mergedMap := git.MergedBranches(head)
 	var merged []string
-	for _, line := range strings.Split(mergedOut, "\n") {
-		name := strings.TrimSpace(strings.TrimLeft(line, "* "))
-		if name != "" && name != head && name != current {
+	for name := range mergedMap {
+		if name != head && name != current {
 			merged = append(merged, name)
 		}
 	}

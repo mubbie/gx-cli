@@ -106,6 +106,11 @@ func runRetarget(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if !git.IsClean() {
+		ui.PrintWarning("You have uncommitted changes. Stash or commit them before retargeting.")
+		return nil
+	}
+
 	// Fetch
 	fmt.Println("  Fetching latest from remote...")
 	git.Run("fetch", "origin")
@@ -113,7 +118,7 @@ func runRetarget(cmd *cobra.Command, args []string) error {
 	// Rebase
 	fmt.Printf("  Rebasing %s onto %s (using --onto)...\n", branch, remoteTarget)
 	c := exec.Command("git", "rebase", "--onto", remoteTarget, oldParentRef, branch)
-	out, err := c.CombinedOutput()
+	_, err := c.CombinedOutput()
 	if err != nil {
 		ui.PrintError("Rebase conflict encountered")
 		fmt.Println()
@@ -133,8 +138,6 @@ func runRetarget(cmd *cobra.Command, args []string) error {
 		fmt.Printf("    3. Run: gx retarget %s %s\n", branch, newTarget)
 		return nil
 	}
-	_ = out
-
 	// Push
 	if _, err := git.Run("push", "--force-with-lease", "origin", branch); err != nil {
 		ui.PrintWarning(fmt.Sprintf("Rebased but failed to push: %s", err))

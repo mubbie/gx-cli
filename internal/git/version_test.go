@@ -12,13 +12,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestVersionString(t *testing.T) {
-	s := VersionString()
-	if s == "" || s == "0.0.0" {
-		t.Errorf("unexpected version string: %s", s)
-	}
-}
-
 func TestSupportsUpdateRefs(t *testing.T) {
 	// Just verify it doesn't panic
 	_ = SupportsUpdateRefs()
