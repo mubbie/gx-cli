@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gx-git"
-version = "2.5.2"
+version = "2.6.0"
 description = "Git Productivity Toolkit"
 readme = "README.md"
 license = {text = "MIT"}

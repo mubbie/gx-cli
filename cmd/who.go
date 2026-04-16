@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
+
 	"github.com/mubbie/gx-cli/internal/git"
 	"github.com/mubbie/gx-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -26,6 +28,8 @@ type contributor struct {
 	name    string
 	emails  map[string]bool
 	commits int
+	added   int
+	deleted int
 }
 
 func runWho(cmd *cobra.Command, args []string) error {
@@ -40,52 +44,91 @@ func runWho(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return whoRepo(n, since)
 	}
-	// File or directory level not ported yet in this phase
 	ui.PrintInfo("File/directory-level who is coming soon. Showing repo level.")
 	return whoRepo(n, since)
 }
 
 func whoRepo(n int, since string) error {
 	sp := ui.StartSpinner("Analyzing contributors...")
-	gitArgs := []string{"shortlog", "-sne", "--all"}
-	if since != "" {
-		gitArgs = append(gitArgs, "--since="+since)
-	}
-	out, err := git.Run(gitArgs...)
-	sp.Stop()
-	if err != nil || out == "" {
-		ui.PrintInfo("No contributors found.")
-		return nil
-	}
 
-	// Parse entries
+	// Get commit counts + emails
+	shortlogArgs := []string{"shortlog", "-sne", "--all"}
+	if since != "" {
+		shortlogArgs = append(shortlogArgs, "--since="+since)
+	}
+	shortlogOut, err := git.Run(shortlogArgs...)
+
+	// Get line stats per author (added/deleted)
+	numstatArgs := []string{"log", "--all", "--numstat", "--format=%aE"}
+	if since != "" {
+		numstatArgs = append(numstatArgs, "--since="+since)
+	}
+	numstatOut := git.RunUnchecked(numstatArgs...)
+
+	// Parse shortlog
 	type rawEntry struct {
 		name    string
 		email   string
 		commits int
 	}
 	var raw []rawEntry
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+	if err == nil && shortlogOut != "" {
+		for _, line := range strings.Split(shortlogOut, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, "\t", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			var commits int
+			fmt.Sscanf(strings.TrimSpace(parts[0]), "%d", &commits)
+			nameEmail := strings.TrimSpace(parts[1])
+			name, email := nameEmail, ""
+			if idx := strings.Index(nameEmail, "<"); idx >= 0 {
+				name = strings.TrimSpace(nameEmail[:idx])
+				end := strings.Index(nameEmail, ">")
+				if end > idx {
+					email = strings.ToLower(nameEmail[idx+1 : end])
+				}
+			}
+			raw = append(raw, rawEntry{name, email, commits})
 		}
-		parts := strings.SplitN(line, "\t", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		var commits int
-		fmt.Sscanf(strings.TrimSpace(parts[0]), "%d", &commits)
-		nameEmail := strings.TrimSpace(parts[1])
-		name, email := nameEmail, ""
-		if idx := strings.Index(nameEmail, "<"); idx >= 0 {
-			name = strings.TrimSpace(nameEmail[:idx])
-			end := strings.Index(nameEmail, ">")
-			if end > idx {
-				email = strings.ToLower(nameEmail[idx+1 : end])
+	}
+
+	// Parse numstat to get lines per email
+	linesByEmail := map[string][2]int{} // email -> [added, deleted]
+	if numstatOut != "" {
+		var currentEmail string
+		for _, line := range strings.Split(numstatOut, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Email lines from --format=%aE
+			if !strings.Contains(line, "\t") && strings.Contains(line, "@") {
+				currentEmail = strings.ToLower(line)
+				continue
+			}
+			// Numstat lines: "added\tdeleted\tfile"
+			parts := strings.SplitN(line, "\t", 3)
+			if len(parts) >= 2 && currentEmail != "" {
+				var a, d int
+				fmt.Sscanf(parts[0], "%d", &a)
+				fmt.Sscanf(parts[1], "%d", &d)
+				stats := linesByEmail[currentEmail]
+				stats[0] += a
+				stats[1] += d
+				linesByEmail[currentEmail] = stats
 			}
 		}
-		raw = append(raw, rawEntry{name, email, commits})
+	}
+
+	if len(raw) == 0 {
+		sp.Stop()
+		ui.PrintInfo("No contributors found.")
+		return nil
 	}
 
 	// Union-find dedup
@@ -149,20 +192,39 @@ func whoRepo(n int, since string) error {
 	}
 	for root, emails := range groupEmails {
 		groups[root].emails = emails
+		// Sum line stats across all emails in this group
+		for email := range emails {
+			if stats, ok := linesByEmail[email]; ok {
+				groups[root].added += stats[0]
+				groups[root].deleted += stats[1]
+			}
+		}
 	}
 
-	// Sort by commits
+	// Calculate total lines for percentage
+	totalLines := 0
+	for _, g := range groups {
+		totalLines += g.added
+	}
+
+	// Sort by lines added (primary), commits (secondary)
 	var sorted []*contributor
 	for _, g := range groups {
 		sorted = append(sorted, g)
 	}
 	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].added != sorted[j].added {
+			return sorted[i].added > sorted[j].added
+		}
 		return sorted[i].commits > sorted[j].commits
 	})
 
 	// Current user
 	currentName := git.RunUnchecked("config", "user.name")
 	currentEmail := strings.ToLower(git.RunUnchecked("config", "user.email"))
+
+	// Build output into buffer, then stop spinner and print
+	var buf bytes.Buffer
 
 	var rows [][]string
 	for i, c := range sorted {
@@ -194,21 +256,37 @@ func whoRepo(n int, since string) error {
 		sort.Strings(emailList)
 
 		lastActive := getAuthorLastEdit(c.name, ".")
+
+		// Lines and percentage
+		linesStr := ui.AddStyle.Render(fmt.Sprintf("+%d", c.added)) + " " + ui.DelStyle.Render(fmt.Sprintf("-%d", c.deleted))
+		pct := ""
+		if totalLines > 0 {
+			pct = fmt.Sprintf("%.1f%%", float64(c.added)/float64(totalLines)*100)
+		}
+
 		rows = append(rows, []string{
 			ui.DimStyle.Render(fmt.Sprintf("%d", i+1)),
 			displayName,
-			ui.DimStyle.Render(strings.Join(emailList, ", ")),
+			linesStr,
+			pct,
 			ui.BoldStyle.Render(fmt.Sprintf("%d", c.commits)),
 			ui.DateStyle.Render(lastActive),
 		})
 	}
 
-	fmt.Println()
-	ui.PrintTable([]string{"#", "Author", "Email", "Commits", "Last Active"}, rows, "Top contributors")
+	// Stop spinner AFTER all data is ready, BEFORE printing
+	sp.Stop()
+
+	fmt.Fprintln(&buf)
+	// Print table
+	ui.PrintTableTo(&buf, []string{"#", "Author", "Lines", "%", "Commits", "Last Active"}, rows, "Top contributors")
 
 	if currentName != "" || currentEmail != "" {
-		fmt.Printf("\n%s\n", ui.DimStyle.Render(fmt.Sprintf("You: %s <%s>", currentName, currentEmail)))
+		fmt.Fprintf(&buf, "\n%s\n", ui.DimStyle.Render(fmt.Sprintf("You: %s <%s>", currentName, currentEmail)))
 	}
+
+	// Print all at once
+	fmt.Print(buf.String())
 	return nil
 }
 
