@@ -21,6 +21,7 @@ func init() {
 		RunE:  runWho,
 	}
 	cmd.Flags().IntP("number", "n", 5, "Number of contributors to show")
+	cmd.Flags().String("since", "", "Only consider contributions after this date (e.g., 6months, 2024-01-01)")
 	cmd.Flags().Bool("no-limit", false, "Remove the 200-file cap for directory analysis")
 	rootCmd.AddCommand(cmd)
 }
@@ -32,9 +33,10 @@ func runWho(cmd *cobra.Command, args []string) error {
 	}
 
 	n, _ := cmd.Flags().GetInt("number")
+	since, _ := cmd.Flags().GetString("since")
 
 	if len(args) == 0 {
-		return whoRepo(n)
+		return whoRepo(n, since)
 	}
 
 	path := args[0]
@@ -45,9 +47,9 @@ func runWho(cmd *cobra.Command, args []string) error {
 	}
 	if info.IsDir() {
 		noLimit, _ := cmd.Flags().GetBool("no-limit")
-		return whoDir(path, n, noLimit)
+		return whoDir(path, n, since, noLimit)
 	}
-	return whoFile(path, n)
+	return whoFile(path, n, since)
 }
 
 // --- File-level: git blame (fast, ~100ms per file) ---
@@ -59,10 +61,15 @@ type blameAuthor struct {
 	lastDate string
 }
 
-func whoFile(path string, n int) error {
+func whoFile(path string, n int, since string) error {
 	sp := ui.StartSpinner(fmt.Sprintf("Analyzing %s...", path))
 
-	out, err := git.Run("blame", "--line-porcelain", path)
+	blameArgs := []string{"blame", "--line-porcelain"}
+	if since != "" {
+		blameArgs = append(blameArgs, "--since", since)
+	}
+	blameArgs = append(blameArgs, path)
+	out, err := git.Run(blameArgs...)
 	if err != nil {
 		sp.Stop()
 		ui.PrintError(fmt.Sprintf("Failed to blame %s: %s", path, err))
@@ -145,7 +152,7 @@ func whoFile(path string, n int) error {
 
 // --- Directory-level: concurrent blame across files ---
 
-func whoDir(dir string, n int, noLimit bool) error {
+func whoDir(dir string, n int, since string, noLimit bool) error {
 	sp := ui.StartSpinner(fmt.Sprintf("Analyzing %s...", dir))
 
 	filesOut, err := git.Run("ls-files", dir)
@@ -192,7 +199,12 @@ func whoDir(dir string, n int, noLimit bool) error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			out := git.RunUnchecked("blame", "--line-porcelain", f)
+			bArgs := []string{"blame", "--line-porcelain"}
+			if since != "" {
+				bArgs = append(bArgs, "--since", since)
+			}
+			bArgs = append(bArgs, f)
+			out := git.RunUnchecked(bArgs...)
 			counts := map[string]int{}
 			emails := map[string]string{}
 			var name, email string
@@ -284,10 +296,14 @@ func whoDir(dir string, n int, noLimit bool) error {
 
 // --- Repo-level: git shortlog (fast, commits only) ---
 
-func whoRepo(n int) error {
+func whoRepo(n int, since string) error {
 	sp := ui.StartSpinner("Analyzing contributors...")
 
-	out, err := git.Run("shortlog", "-sne", "HEAD")
+	args := []string{"shortlog", "-sne", "HEAD"}
+	if since != "" {
+		args = append(args, "--since="+since)
+	}
+	out, err := git.Run(args...)
 	sp.Stop()
 	if err != nil || out == "" {
 		ui.PrintInfo("No contributors found.")

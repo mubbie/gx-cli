@@ -14,12 +14,15 @@ from gx.utils.display import console, print_error, print_info, print_table, prin
 from gx.utils.git import GitError, ensure_git_repo, run_git, time_ago
 
 
-def _blame_file(filepath: str, cwd: str | None = None) -> dict[str, dict]:
+def _blame_file(filepath: str, cwd: str | None = None, since: str | None = None) -> dict[str, dict]:
     """Run git blame on a file and return per-author stats.
 
     Returns {author: {"lines": int, "email": str, "last_ts": str}}.
     """
-    args = ["blame", "--line-porcelain", filepath]
+    args = ["blame", "--line-porcelain"]
+    if since:
+        args.extend(["--since", since])
+    args.append(filepath)
     try:
         output = run_git(args, cwd=cwd)
     except GitError:
@@ -70,9 +73,11 @@ def _get_tracked_files(directory: str, cwd: str | None = None) -> list[str]:
     return output.splitlines()
 
 
-def _repo_level(n: int) -> None:
+def _repo_level(n: int, since: str | None = None) -> None:
     """Show top contributors to the entire repo (fast, shortlog only)."""
     args = ["shortlog", "-sne", "HEAD"]
+    if since:
+        args.extend(["--since", since])
     output = run_git(args)
     if not output:
         print_info("No contributors found.")
@@ -107,13 +112,13 @@ def _repo_level(n: int) -> None:
     )
 
 
-def _file_level(filepath: str, n: int) -> None:
+def _file_level(filepath: str, n: int, since: str | None = None) -> None:
     """Show who knows a specific file best (blame-based)."""
     if not os.path.exists(filepath):
         print_error(f"File not found: {filepath}")
         raise typer.Exit(1)
 
-    stats = _blame_file(filepath)
+    stats = _blame_file(filepath, since=since)
     if not stats:
         print_info(f"No blame data for {filepath}")
         return
@@ -135,7 +140,7 @@ def _file_level(filepath: str, n: int) -> None:
     )
 
 
-def _dir_level(directory: str, n: int, no_limit: bool) -> None:
+def _dir_level(directory: str, n: int, since: str | None = None, no_limit: bool = False) -> None:
     """Show who knows a directory best (concurrent blame)."""
     files = _get_tracked_files(directory)
     if not files:
@@ -162,7 +167,7 @@ def _dir_level(directory: str, n: int, no_limit: bool) -> None:
         task = progress.add_task(f"Analyzing {len(files)} files...", total=len(files))
 
         def blame_one(f: str) -> tuple[str, dict[str, dict]]:
-            return f, _blame_file(f)
+            return f, _blame_file(f, since=since)
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(blame_one, f): f for f in files}
@@ -200,6 +205,7 @@ def _dir_level(directory: str, n: int, no_limit: bool) -> None:
 def who(
     path: str = typer.Argument(None, help="File or directory to analyze (omit for repo-level)."),
     n: int = typer.Option(DEFAULT_WHO_LIMIT, "-n", "--number", help="Number of contributors to show."),
+    since: str = typer.Option(None, "--since", help="Only consider contributions after this date."),
     no_limit: bool = typer.Option(False, "--no-limit", help="Remove file cap for directory analysis."),
 ) -> None:
     """Show who knows a file, directory, or repo best."""
@@ -210,8 +216,8 @@ def who(
         raise typer.Exit(1)
 
     if path is None:
-        _repo_level(n)
+        _repo_level(n, since)
     elif os.path.isdir(path):
-        _dir_level(path, n, no_limit)
+        _dir_level(path, n, since, no_limit)
     else:
-        _file_level(path, n)
+        _file_level(path, n, since)
