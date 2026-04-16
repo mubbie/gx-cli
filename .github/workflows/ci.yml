@@ -26,6 +26,7 @@ jobs:
           else
             go build -o gx .
           fi
+      - run: go test ./... -count=1
       - run: go vet ./...
       - name: Verify binary
         shell: bash
