@@ -15,4 +15,4 @@ venv/
 env/
 .claude/
 *.exe
-gx
+/gx
