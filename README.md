@@ -6,7 +6,7 @@
 
 Git Productivity Toolkit. 25 commands for everyday git, stacked PRs, and code insight.
 
-**[Documentation](https://gx-cli-docs.mintlify.app)** | **[Releases](https://github.com/mubbie/gx-cli/releases)**
+**[Documentation](https://gx.mubbie.dev)** | **[Releases](https://github.com/mubbie/gx-cli/releases)**
 
 ## Install
 
@@ -66,7 +66,7 @@ gx up / gx down                     # Navigate the stack
 gx handoff --markdown --copy         # Generate PR summary
 ```
 
-See the **[full documentation](https://gx-cli-docs.mintlify.app)** for detailed usage, flags, and examples for every command.
+See the **[full documentation](https://gx.mubbie.dev)** for detailed usage, flags, and examples for every command.
 
 ## Contributing
 
