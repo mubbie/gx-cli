@@ -21,6 +21,7 @@ from gx.utils.git import (
     GitError,
     ensure_git_repo,
     get_current_branch,
+    get_git_version,
     is_clean_working_tree,
     run_git,
     supports_update_refs,
@@ -68,15 +69,17 @@ def _sync_with_onto(chain: list[str]) -> bool:
     """Sync using --onto iteration (Git < 2.38 fallback). Returns True on success."""
     console.print("  Rebasing stack (using --onto fallback)...")
 
+    # Capture all pre-rebase SHAs before any rebasing begins
+    pre_rebase_sha: dict[str, str] = {}
+    for b in chain:
+        try:
+            pre_rebase_sha[b] = run_git(["rev-parse", b])
+        except GitError:
+            pre_rebase_sha[b] = ""
+
     for i in range(1, len(chain)):
         parent = chain[i - 1]
         branch = chain[i]
-
-        # Record old SHA before rebase
-        try:
-            old_sha = run_git(["rev-parse", parent])
-        except GitError:
-            old_sha = ""
 
         if i == 1:
             # First branch: simple rebase
@@ -96,7 +99,7 @@ def _sync_with_onto(chain: list[str]) -> bool:
                 print_error(f"Rebase of {branch} timed out.")
                 return False
         else:
-            # Subsequent branches: use --onto with old/new parent SHAs
+            # Subsequent branches: use --onto with pre-rebase SHA as old base
             try:
                 new_parent_sha = run_git(["rev-parse", parent])
             except GitError as e:
@@ -105,7 +108,7 @@ def _sync_with_onto(chain: list[str]) -> bool:
 
             try:
                 result = subprocess.run(
-                    ["git", "rebase", "--onto", new_parent_sha, old_sha, branch],
+                    ["git", "rebase", "--onto", new_parent_sha, pre_rebase_sha[parent], branch],
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
@@ -212,7 +215,7 @@ def sync(
 
     if dry_run:
         strategy = "--update-refs" if use_update_refs else "--onto (fallback)"
-        major, minor, _ = __import__("gx.utils.git", fromlist=["get_git_version"]).get_git_version()
+        major, minor, _ = get_git_version()
         actions = [
             f"Would sync stack: {' -> '.join(chain)}",
             "",
